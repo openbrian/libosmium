@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -34,69 +34,114 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include <cassert>
-#include <iterator>
+#include <cstddef>
 #include <string>
+#include <utility>
 
-#include <osmium/osm/location.hpp>
+#include <osmium/geom/coordinates.hpp>
 #include <osmium/geom/factory.hpp>
 
 namespace osmium {
 
     namespace geom {
 
-        struct wkt_factory_traits {
-            typedef std::string point_type;
-            typedef std::string linestring_type;
-            typedef std::string polygon_type;
-        };
+        namespace detail {
 
-        class WKTFactory : public GeometryFactory<WKTFactory, wkt_factory_traits> {
+            class WKTFactoryImpl {
 
-            friend class GeometryFactory;
+                std::string m_str;
+                int m_precision;
 
-        public:
+            public:
 
-            WKTFactory() :
-                GeometryFactory<WKTFactory, wkt_factory_traits>() {
-            }
+                typedef std::string point_type;
+                typedef std::string linestring_type;
+                typedef std::string polygon_type;
+                typedef std::string multipolygon_type;
+                typedef std::string ring_type;
 
-        private:
+                WKTFactoryImpl(int precision = 7) :
+                    m_precision(precision) {
+                }
 
-            std::string m_str {};
-            int m_points {0};
+                /* Point */
 
-            point_type make_point(const Location location) {
-                std::string str {"POINT("};
-                location.as_string(std::back_inserter(str), ' ');
-                str += ')';
-                return str;
-            }
+                point_type make_point(const osmium::geom::Coordinates& xy) const {
+                    std::string str {"POINT"};
+                    xy.append_to_string(str, '(', ' ', ')', m_precision);
+                    return str;
+                }
 
-            void linestring_start() {
-                m_str = "LINESTRING(";
-                m_points = 0;
-            }
+                /* LineString */
 
-            void linestring_add_location(const Location location) {
-                location.as_string(std::back_inserter(m_str), ' ');
-                m_str += ',';
-                ++m_points;
-            }
+                void linestring_start() {
+                    m_str = "LINESTRING(";
+                }
 
-            linestring_type linestring_finish() {
-                if (m_points < 2) {
-                    m_str.clear();
-                    throw geometry_error("not enough points for linestring");
-                } else {
+                void linestring_add_location(const osmium::geom::Coordinates& xy) {
+                    xy.append_to_string(m_str, ' ', m_precision);
+                    m_str += ',';
+                }
+
+                linestring_type linestring_finish(size_t /* num_points */) {
                     assert(!m_str.empty());
                     std::string str;
                     std::swap(str, m_str);
-                    str[str.size()-1] = ')';
+                    str.back() = ')';
                     return str;
                 }
-            }
 
-        }; // class WKTFactory
+                /* MultiPolygon */
+
+                void multipolygon_start() {
+                    m_str = "MULTIPOLYGON(";
+                }
+
+                void multipolygon_polygon_start() {
+                    m_str += '(';
+                }
+
+                void multipolygon_polygon_finish() {
+                    m_str += "),";
+                }
+
+                void multipolygon_outer_ring_start() {
+                    m_str += '(';
+                }
+
+                void multipolygon_outer_ring_finish() {
+                    assert(!m_str.empty());
+                    m_str.back() = ')';
+                }
+
+                void multipolygon_inner_ring_start() {
+                    m_str += ",(";
+                }
+
+                void multipolygon_inner_ring_finish() {
+                    assert(!m_str.empty());
+                    m_str.back() = ')';
+                }
+
+                void multipolygon_add_location(const osmium::geom::Coordinates& xy) {
+                    xy.append_to_string(m_str, ' ', m_precision);
+                    m_str += ',';
+                }
+
+                multipolygon_type multipolygon_finish() {
+                    assert(!m_str.empty());
+                    std::string str;
+                    std::swap(str, m_str);
+                    str.back() = ')';
+                    return str;
+                }
+
+            }; // class WKTFactoryImpl
+
+        } // namespace detail
+
+        template <class TProjection = IdentityProjection>
+        using WKTFactory = GeometryFactory<osmium::geom::detail::WKTFactoryImpl, TProjection>;
 
     } // namespace geom
 

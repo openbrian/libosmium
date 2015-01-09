@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -36,6 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <iosfwd>
 #include <iterator>
 
 #include <osmium/memory/collection.hpp>
@@ -75,7 +76,7 @@ namespace osmium {
 
         static constexpr item_type collection_type = item_type::tag_list;
 
-        const char* key() const {
+        const char* key() const noexcept {
             return reinterpret_cast<const char*>(data());
         }
 
@@ -85,18 +86,34 @@ namespace osmium {
 
     }; // class Tag
 
-    class TagList : public osmium::memory::Collection<Tag> {
+    inline bool operator==(const Tag& a, const Tag& b) {
+        return !std::strcmp(a.key(), b.key()) && !strcmp(a.value(), b.value());
+    }
+
+    inline bool operator<(const Tag& a, const Tag& b) {
+        return (!std::strcmp(a.key(), b.key()) && (std::strcmp(a.value(), b.value()) < 0)) || (std::strcmp(a.key(), b.key()) < 0);
+    }
+
+    /**
+     * Output a Tag to a stream.
+     */
+    template <typename TChar, typename TTraits>
+    inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const Tag& tag) {
+        return out << tag.key() << '=' << tag.value();
+    }
+
+    class TagList : public osmium::memory::Collection<Tag, osmium::item_type::tag_list> {
 
     public:
 
-        static constexpr osmium::item_type itemtype = osmium::item_type::tag_list;
+        typedef size_t size_type;
 
         TagList() :
-            osmium::memory::Collection<Tag>() {
+            osmium::memory::Collection<Tag, osmium::item_type::tag_list>() {
         }
 
-        size_t size() const noexcept {
-            return std::distance(begin(), end());
+        size_type size() const noexcept {
+            return static_cast<size_type>(std::distance(begin(), end()));
         }
 
         const char* get_value_by_key(const char* key, const char* default_value = nullptr) const noexcept {
@@ -108,6 +125,10 @@ namespace osmium {
             } else {
                 return result->value();
             }
+        }
+
+        const char* operator[](const char* key) const noexcept {
+            return get_value_by_key(key);
         }
 
     }; // class TagList

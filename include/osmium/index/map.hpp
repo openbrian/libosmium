@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -36,13 +36,15 @@ DEALINGS IN THE SOFTWARE.
 #include <cstddef>
 #include <type_traits>
 
+#include <osmium/index/index.hpp> // IWYU pragma: export
+
 namespace osmium {
 
-    /**
-     * @brief Namespace for classes indexing OSM data.
-     */
     namespace index {
 
+        /**
+         * @brief Key-value containers with unique integer values for a key
+         */
         namespace map {
 
             /**
@@ -66,16 +68,16 @@ namespace osmium {
              * on 64 bit systems if used in this case. 32 bit systems just
              * can't address that much memory!
              *
-             * @tparam TKey Key type, usually osmium::object_id_type, must be
-             *              an integral type.
+             * @tparam TId Id type, usually osmium::unsigned_object_id_type,
+             *             must be an unsigned integral type.
              * @tparam TValue Value type, usually osmium::Location or size_t.
-             *                Copied by value, so must be small type.
+             *                Copied by value, so should be "small" type.
              */
-            template <typename TKey, typename TValue>
+            template <typename TId, typename TValue>
             class Map {
 
-                static_assert(std::is_integral<TKey>::value && std::is_unsigned<TKey>::value,
-                              "TKey template parameter for class Map must be unsigned integral type");
+                static_assert(std::is_integral<TId>::value && std::is_unsigned<TId>::value,
+                              "TId template parameter for class Map must be unsigned integral type");
 
                 Map(const Map&) = delete;
                 Map& operator=(const Map&) = delete;
@@ -87,30 +89,25 @@ namespace osmium {
 
             public:
 
-                typedef TKey key_type;
-                typedef TValue mapped_type;
+                /// The "key" type, usually osmium::unsigned_object_id_type.
+                typedef TId key_type;
+
+                /// The "value" type, usually a Location or size_t.
+                typedef TValue value_type;
 
                 Map() = default;
 
-// workaround for a bug in GCC 4.7
-#if __GNUC__ == 4 && __GNUC_MINOR__ < 8
-                virtual ~Map() {}
-#else
                 virtual ~Map() = default;
-#endif
-
-                /// The "value" type, usually a coordinates class or similar.
-                typedef TValue value_type;
 
                 virtual void reserve(const size_t) {
                     // default implementation is empty
                 }
 
                 /// Set the field with id to value.
-                virtual void set(const TKey id, const TValue value) = 0;
+                virtual void set(const TId id, const TValue value) = 0;
 
-                /// Retrieve value by key. Does not check for overflow or empty fields.
-                virtual const TValue get(const TKey id) const = 0;
+                /// Retrieve value by id. Does not check for overflow or empty fields.
+                virtual const TValue get(const TId id) const = 0;
 
                 /**
                  * Get the approximate number of items in the storage. The storage
@@ -141,6 +138,10 @@ namespace osmium {
                  */
                 virtual void sort() {
                     // default implementation is empty
+                }
+
+                virtual void dump_as_list(int /*fd*/) const {
+                    std::runtime_error("can't dump as list");
                 }
 
             }; // class Map

@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,6 +33,7 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#include <cassert>
 #include <chrono>
 #include <cinttypes>
 #include <cstddef>
@@ -94,7 +95,16 @@ namespace osmium {
                 template <typename T>
                 void oprintf(std::string& out, const char* format, T value) {
                     char buffer[tmp_buffer_size+1];
-                    snprintf(buffer, sizeof(buffer)/sizeof(char), format, value);
+                    size_t max_size = sizeof(buffer)/sizeof(char);
+#ifndef NDEBUG
+                    int len =
+#endif
+#ifndef _MSC_VER
+                    snprintf(buffer, max_size, format, value);
+#else
+                    _snprintf(buffer, max_size, format, value);
+#endif
+                    assert(len > 0 && static_cast<size_t>(len) < max_size);
                     out += buffer;
                 }
 
@@ -102,11 +112,19 @@ namespace osmium {
 
             class XMLOutputBlock : public osmium::handler::Handler {
 
+                // operation (create, modify, delete) for osc files
+                enum class operation {
+                    op_none   = 0,
+                    op_create = 1,
+                    op_modify = 2,
+                    op_delete = 3
+                }; // enum class operation
+
                 osmium::memory::Buffer m_input_buffer;
 
-                std::string m_out {};
+                std::string m_out;
 
-                char m_last_op {'\0'};
+                operation m_last_op {operation::op_none};
 
                 const bool m_write_visible_flag;
                 const bool m_write_change_ops;
@@ -125,7 +143,7 @@ namespace osmium {
                     }
                 }
 
-                void write_meta(const osmium::Object& object) {
+                void write_meta(const osmium::OSMObject& object) {
                     oprintf(m_out, " id=\"%" PRId64 "\"", object.id());
 
                     if (object.version()) {
@@ -158,7 +176,7 @@ namespace osmium {
                 }
 
                 void write_tags(const osmium::TagList& tags) {
-                    for (auto& tag : tags) {
+                    for (const auto& tag : tags) {
                         write_prefix();
                         m_out += "  <tag k=\"";
                         xml_string(m_out, tag.key());
@@ -168,33 +186,35 @@ namespace osmium {
                     }
                 }
 
-                void open_close_op_tag(const char op) {
+                void open_close_op_tag(const operation op = operation::op_none) {
                     if (op == m_last_op) {
                         return;
                     }
 
                     switch (m_last_op) {
-                        case 'c':
+                        case operation::op_none:
+                            break;
+                        case operation::op_create:
                             m_out += "  </create>\n";
                             break;
-                        case 'm':
+                        case operation::op_modify:
                             m_out += "  </modify>\n";
                             break;
-                        case 'd':
+                        case operation::op_delete:
                             m_out += "  </delete>\n";
-                            break;
-                        default:
                             break;
                     }
 
                     switch (op) {
-                        case 'c':
+                        case operation::op_none:
+                            break;
+                        case operation::op_create:
                             m_out += "  <create>\n";
                             break;
-                        case 'm':
+                        case operation::op_modify:
                             m_out += "  <modify>\n";
                             break;
-                        case 'd':
+                        case operation::op_delete:
                             m_out += "  <delete>\n";
                             break;
                     }
@@ -204,7 +224,7 @@ namespace osmium {
 
             public:
 
-                XMLOutputBlock(osmium::memory::Buffer&& buffer, bool write_visible_flag, bool write_change_ops) :
+                explicit XMLOutputBlock(osmium::memory::Buffer&& buffer, bool write_visible_flag, bool write_change_ops) :
                     m_input_buffer(std::move(buffer)),
                     m_write_visible_flag(write_visible_flag && !write_change_ops),
                     m_write_change_ops(write_change_ops) {
@@ -213,14 +233,14 @@ namespace osmium {
                 XMLOutputBlock(const XMLOutputBlock&) = delete;
                 XMLOutputBlock& operator=(const XMLOutputBlock&) = delete;
 
-                XMLOutputBlock(XMLOutputBlock&& other) = default;
-                XMLOutputBlock& operator=(XMLOutputBlock&& other) = default;
+                XMLOutputBlock(XMLOutputBlock&&) = default;
+                XMLOutputBlock& operator=(XMLOutputBlock&&) = default;
 
                 std::string operator()() {
                     osmium::apply(m_input_buffer.cbegin(), m_input_buffer.cend(), *this);
 
                     if (m_write_change_ops) {
-                        open_close_op_tag('\0');
+                        open_close_op_tag();
                     }
 
                     std::string out;
@@ -230,7 +250,7 @@ namespace osmium {
 
                 void node(const osmium::Node& node) {
                     if (m_write_change_ops) {
-                        open_close_op_tag(node.visible() ? (node.version() == 1 ? 'c' : 'm') : 'd');
+                        open_close_op_tag(node.visible() ? (node.version() == 1 ? operation::op_create : operation::op_modify) : operation::op_delete);
                     }
 
                     write_prefix();
@@ -240,9 +260,9 @@ namespace osmium {
 
                     if (node.location()) {
                         m_out += " lat=\"";
-                        osmium::Location::coordinate2string(std::back_inserter(m_out), node.location().lat());
+                        osmium::util::double2string(std::back_inserter(m_out), node.location().lat_without_check(), 7);
                         m_out += "\" lon=\"";
-                        osmium::Location::coordinate2string(std::back_inserter(m_out), node.location().lon());
+                        osmium::util::double2string(std::back_inserter(m_out), node.location().lon_without_check(), 7);
                         m_out += "\"";
                     }
 
@@ -261,7 +281,7 @@ namespace osmium {
 
                 void way(const osmium::Way& way) {
                     if (m_write_change_ops) {
-                        open_close_op_tag(way.visible() ? (way.version() == 1 ? 'c' : 'm') : 'd');
+                        open_close_op_tag(way.visible() ? (way.version() == 1 ? operation::op_create : operation::op_modify) : operation::op_delete);
                     }
 
                     write_prefix();
@@ -275,9 +295,9 @@ namespace osmium {
 
                     m_out += ">\n";
 
-                    for (auto& way_node : way.nodes()) {
+                    for (const auto& node_ref : way.nodes()) {
                         write_prefix();
-                        oprintf(m_out, "  <nd ref=\"%" PRId64 "\"/>\n", way_node.ref());
+                        oprintf(m_out, "  <nd ref=\"%" PRId64 "\"/>\n", node_ref.ref());
                     }
 
                     write_tags(way.tags());
@@ -288,7 +308,7 @@ namespace osmium {
 
                 void relation(const osmium::Relation& relation) {
                     if (m_write_change_ops) {
-                        open_close_op_tag(relation.visible() ? (relation.version() == 1 ? 'c' : 'm') : 'd');
+                        open_close_op_tag(relation.visible() ? (relation.version() == 1 ? operation::op_create : operation::op_modify) : operation::op_delete);
                     }
 
                     write_prefix();
@@ -302,7 +322,7 @@ namespace osmium {
 
                     m_out += ">\n";
 
-                    for (auto& member : relation.members()) {
+                    for (const auto& member : relation.members()) {
                         write_prefix();
                         m_out += "  <member type=\"";
                         m_out += item_type_to_name(member.type());
@@ -340,10 +360,10 @@ namespace osmium {
                     }
 
                     if (changeset.bounds()) {
-                        oprintf(m_out, " min_lon=\"%.7f\"", changeset.bounds().bottom_left().lon());
-                        oprintf(m_out, " min_lat=\"%.7f\"", changeset.bounds().bottom_left().lat());
-                        oprintf(m_out, " max_lon=\"%.7f\"", changeset.bounds().top_right().lon());
-                        oprintf(m_out, " max_lat=\"%.7f\"", changeset.bounds().top_right().lat());
+                        oprintf(m_out, " min_lon=\"%.7f\"", changeset.bounds().bottom_left().lon_without_check());
+                        oprintf(m_out, " min_lat=\"%.7f\"", changeset.bounds().bottom_left().lat_without_check());
+                        oprintf(m_out, " max_lon=\"%.7f\"", changeset.bounds().top_right().lon_without_check());
+                        oprintf(m_out, " max_lat=\"%.7f\"", changeset.bounds().top_right().lat_without_check());
                     }
 
                     if (!changeset.user_is_anonymous()) {
@@ -385,11 +405,7 @@ namespace osmium {
                 }
 
                 void write_buffer(osmium::memory::Buffer&& buffer) override final {
-                    XMLOutputBlock output_block(std::move(buffer), m_write_visible_flag, m_file.is_true("xml_change_format"));
-                    m_output_queue.push(osmium::thread::Pool::instance().submit(std::move(output_block)));
-                    while (m_output_queue.size() > 10) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // XXX
-                    }
+                    m_output_queue.push(osmium::thread::Pool::instance().submit(XMLOutputBlock{std::move(buffer), m_write_visible_flag, m_file.is_true("xml_change_format")}));
                 }
 
                 void write_header(const osmium::io::Header& header) override final {
@@ -413,7 +429,7 @@ namespace osmium {
                         out += "\">\n";
                     }
 
-                    for (auto& box : header.boxes()) {
+                    for (const auto& box : header.boxes()) {
                         out += "  <bounds";
                         oprintf(out, " minlon=\"%.7f\"", box.bottom_left().lon());
                         oprintf(out, " minlat=\"%.7f\"", box.bottom_left().lat());

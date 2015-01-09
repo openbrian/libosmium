@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -48,71 +48,71 @@ namespace osmium {
 
     protected:
 
-        osmium::Object* m_prev;
-        osmium::Object* m_curr;
-        osmium::Object* m_next;
+        osmium::OSMObject* m_prev;
+        osmium::OSMObject* m_curr;
+        osmium::OSMObject* m_next;
 
     public:
 
-        DiffObject() :
+        DiffObject() noexcept :
             m_prev(nullptr),
             m_curr(nullptr),
             m_next(nullptr) {
         }
 
-        DiffObject(osmium::Object& prev, osmium::Object& curr, osmium::Object& next) :
+        explicit DiffObject(osmium::OSMObject& prev, osmium::OSMObject& curr, osmium::OSMObject& next) noexcept :
             m_prev(&prev),
             m_curr(&curr),
             m_next(&next) {
         }
 
-        DiffObject(const DiffObject& other) = default;
-        DiffObject& operator=(const DiffObject& other) = default;
+        DiffObject(const DiffObject&) = default;
+        DiffObject& operator=(const DiffObject&) = default;
 
-        DiffObject(DiffObject&& other) = default;
-        DiffObject& operator=(DiffObject&& other) = default;
+        DiffObject(DiffObject&&) = default;
+        DiffObject& operator=(DiffObject&&) = default;
 
-        const osmium::Object& prev() const {
+        const osmium::OSMObject& prev() const noexcept {
             return *m_prev;
         }
 
-        const osmium::Object& curr() const {
+        const osmium::OSMObject& curr() const noexcept {
             return *m_curr;
         }
 
-        const osmium::Object& next() const {
+        const osmium::OSMObject& next() const noexcept {
             return *m_next;
         }
 
-        bool first() const {
+        bool first() const noexcept {
             return m_prev == m_curr;
         }
 
-        bool last() const {
+        bool last() const noexcept {
             return m_curr == m_next;
         }
 
-        osmium::item_type type() const {
+        osmium::item_type type() const noexcept {
             return m_curr->type();
         }
 
-        osmium::object_id_type id() const {
+        osmium::object_id_type id() const noexcept {
             return m_curr->id();
         }
 
-        osmium::object_version_type version() const {
+        osmium::object_version_type version() const noexcept {
             return m_curr->version();
         }
 
-        osmium::changeset_id_type changeset() const {
+        osmium::changeset_id_type changeset() const noexcept {
             return m_curr->changeset();
         }
 
-        const osmium::Timestamp start_time() const {
+        const osmium::Timestamp start_time() const noexcept {
             return m_curr->timestamp();
         }
 
-        const osmium::Timestamp end_time() const {
+        const osmium::Timestamp end_time() const noexcept {
             return last() ? osmium::Timestamp() : m_next->timestamp();
         }
 
@@ -123,25 +123,25 @@ namespace osmium {
 
     public:
 
-        DiffObjectDerived(T& prev, T& curr, T& next) :
+        DiffObjectDerived(T& prev, T& curr, T& next) noexcept :
             DiffObject(prev, curr, next) {
         }
 
-        DiffObjectDerived(const DiffObjectDerived& other) = default;
-        DiffObjectDerived& operator=(const DiffObjectDerived& other) = default;
+        DiffObjectDerived(const DiffObjectDerived&) = default;
+        DiffObjectDerived& operator=(const DiffObjectDerived&) = default;
 
-        DiffObjectDerived(DiffObjectDerived&& other) = default;
-        DiffObjectDerived& operator=(DiffObjectDerived&& other) = default;
+        DiffObjectDerived(DiffObjectDerived&&) = default;
+        DiffObjectDerived& operator=(DiffObjectDerived&&) = default;
 
-        const T& prev() const {
+        const T& prev() const noexcept {
             return *static_cast<const T*>(m_prev);
         }
 
-        const T& curr() const {
+        const T& curr() const noexcept {
             return *static_cast<const T*>(m_curr);
         }
 
-        const T& next() const {
+        const T& next() const noexcept {
             return *static_cast<const T*>(m_next);
         }
 

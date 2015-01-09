@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -46,12 +46,12 @@ namespace osmium {
 
         namespace multimap {
 
-            template <typename TKey, typename TValue, template<typename...> class TVector>
-            class VectorBasedSparseMultimap : public Multimap<TKey, TValue> {
+            template <typename TId, typename TValue, template<typename...> class TVector>
+            class VectorBasedSparseMultimap : public Multimap<TId, TValue> {
 
             public:
 
-                typedef typename std::pair<TKey, TValue> element_type;
+                typedef typename std::pair<TId, TValue> element_type;
                 typedef TVector<element_type> vector_type;
                 typedef typename vector_type::iterator iterator;
                 typedef typename vector_type::const_iterator const_iterator;
@@ -61,22 +61,35 @@ namespace osmium {
                 vector_type m_vector;
 
                 static bool is_removed(element_type& element) {
-                    return element.second == TValue {};
+                    return element.second == osmium::index::empty_value<TValue>();
                 }
 
             public:
 
-                void set(const TKey key, const TValue value) override final {
-                    m_vector.push_back(element_type(key, value));
+                void set(const TId id, const TValue value) override final {
+                    m_vector.push_back(element_type(id, value));
                 }
 
-                void unsorted_set(const TKey key, const TValue value) {
-                    m_vector.push_back(element_type(key, value));
+                void unsorted_set(const TId id, const TValue value) {
+                    m_vector.push_back(element_type(id, value));
                 }
 
-                std::pair<iterator, iterator> get_all(const TKey key) {
-                    const element_type element {key, TValue {}};
+                std::pair<iterator, iterator> get_all(const TId id) {
+                    const element_type element {
+                        id,
+                        osmium::index::empty_value<TValue>()
+                    };
                     return std::equal_range(m_vector.begin(), m_vector.end(), element, [](const element_type& a, const element_type& b) {
+                        return a.first < b.first;
+                    });
+                }
+
+                std::pair<const_iterator, const_iterator> get_all(const TId id) const {
+                    const element_type element {
+                        id,
+                        osmium::index::empty_value<TValue>()
+                    };
+                    return std::equal_range(m_vector.cbegin(), m_vector.cend(), element, [](const element_type& a, const element_type& b) {
                         return a.first < b.first;
                     });
                 }
@@ -102,8 +115,8 @@ namespace osmium {
                     std::sort(m_vector.begin(), m_vector.end());
                 }
 
-                void remove(const TKey key, const TValue value) {
-                    auto r = get_all(key);
+                void remove(const TId id, const TValue value) {
+                    auto r = get_all(id);
                     for (auto it = r.first; it != r.second; ++it) {
                         if (it->second == value) {
                             it->second = 0;
@@ -123,7 +136,7 @@ namespace osmium {
                     );
                 }
 
-                void dump_as_list(int fd) const {
+                void dump_as_list(int fd) const override final {
                     osmium::io::detail::reliable_write(fd, reinterpret_cast<const char*>(m_vector.data()), byte_size());
                 }
 

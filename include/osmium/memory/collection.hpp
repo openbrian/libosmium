@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -34,7 +34,7 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include <iterator>
-#include <ostream>
+#include <iosfwd>
 #include <type_traits>
 
 #include <osmium/memory/item.hpp>
@@ -55,13 +55,11 @@ namespace osmium {
 
         public:
 
-            // XXX it is unclear whether we need this, but it came up somewhere
-            // that weed needed to default-initialize a CollectionIterator
-            CollectionIterator() :
+            CollectionIterator() noexcept :
                 m_data(nullptr) {
             }
 
-            CollectionIterator(data_type data) :
+            CollectionIterator(data_type data) noexcept :
                 m_data(data) {
             }
 
@@ -76,12 +74,16 @@ namespace osmium {
                 return tmp;
             }
 
-            bool operator==(const CollectionIterator<TMember>& rhs) const {
+            bool operator==(const CollectionIterator<TMember>& rhs) const noexcept {
                 return m_data == rhs.m_data;
             }
 
-            bool operator!=(const CollectionIterator<TMember>& rhs) const {
+            bool operator!=(const CollectionIterator<TMember>& rhs) const noexcept {
                 return m_data != rhs.m_data;
+            }
+
+            unsigned char* data() const noexcept {
+                return m_data;
             }
 
             TMember& operator*() const {
@@ -92,14 +94,14 @@ namespace osmium {
                 return reinterpret_cast<TMember*>(m_data);
             }
 
-            friend std::ostream& operator<<(std::ostream& out, const CollectionIterator<TMember>& iter) {
-                out << static_cast<void*>(iter.m_data);
-                return out;
+            template <typename TChar, typename TTraits>
+            friend std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const CollectionIterator<TMember>& iter) {
+                return out << static_cast<const void*>(iter.m_data);
             }
 
         }; // class CollectionIterator
 
-        template <class TMember>
+        template <class TMember, osmium::item_type TCollectionItemType>
         class Collection : public Item {
 
         public:
@@ -108,16 +110,18 @@ namespace osmium {
             typedef CollectionIterator<const TMember> const_iterator;
             typedef TMember value_type;
 
+            static constexpr osmium::item_type itemtype = TCollectionItemType;
+
             Collection() :
-                Item(sizeof(Collection<TMember>), TMember::collection_type) {
+                Item(sizeof(Collection<TMember, TCollectionItemType>), TCollectionItemType) {
             }
 
             bool empty() const {
-                return sizeof(Collection<TMember>) == byte_size();
+                return sizeof(Collection<TMember, TCollectionItemType>) == byte_size();
             }
 
             iterator begin() {
-                return iterator(data() + sizeof(Collection<TMember>));
+                return iterator(data() + sizeof(Collection<TMember, TCollectionItemType>));
             }
 
             iterator end() {
@@ -125,7 +129,7 @@ namespace osmium {
             }
 
             const_iterator cbegin() const {
-                return const_iterator(data() + sizeof(Collection<TMember>));
+                return const_iterator(data() + sizeof(Collection<TMember, TCollectionItemType>));
             }
 
             const_iterator cend() const {

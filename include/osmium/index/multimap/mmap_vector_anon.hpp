@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -36,7 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #ifdef __linux__
 
 #include <osmium/index/multimap/vector.hpp>
-#include <osmium/detail/mmap_vector_anon.hpp>
+#include <osmium/index/detail/mmap_vector_anon.hpp>
 
 namespace osmium {
 
@@ -44,8 +44,8 @@ namespace osmium {
 
         namespace multimap {
 
-            template <typename TKey, typename TValue>
-            using SparseMultimapMmap = VectorBasedSparseMultimap<TKey, TValue, osmium::detail::mmap_vector_anon>;
+            template <typename TId, typename TValue>
+            using SparseMultimapMmap = VectorBasedSparseMultimap<TId, TValue, osmium::detail::mmap_vector_anon>;
 
         } // namespace multimap
 

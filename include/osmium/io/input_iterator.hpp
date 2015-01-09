@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -56,9 +56,11 @@ namespace osmium {
 
             static_assert(std::is_base_of<osmium::memory::Item, TItem>::value, "TItem must derive from osmium::buffer::Item");
 
+            typedef typename osmium::memory::Buffer::t_iterator<TItem> item_iterator;
+
             TSource* m_source;
-            std::shared_ptr<osmium::memory::Buffer> m_buffer {};
-            osmium::memory::Buffer::iterator m_iter {};
+            std::shared_ptr<osmium::memory::Buffer> m_buffer;
+            item_iterator m_iter {};
 
             void update_buffer() {
                 do {
@@ -66,11 +68,11 @@ namespace osmium {
                     if (!m_buffer || !*m_buffer) { // end of input
                         m_source = nullptr;
                         m_buffer.reset();
-                        m_iter = osmium::memory::Buffer::iterator();
+                        m_iter = item_iterator();
                         return;
                     }
-                    m_iter = m_buffer->begin();
-                } while (m_iter == m_buffer->end());
+                    m_iter = m_buffer->begin<TItem>();
+                } while (m_iter == m_buffer->end<TItem>());
             }
 
         public:
@@ -81,22 +83,22 @@ namespace osmium {
             typedef TItem*                  pointer;
             typedef TItem&                  reference;
 
-            InputIterator(TSource& source) :
+            explicit InputIterator(TSource& source) :
                 m_source(&source) {
                 update_buffer();
             }
 
             // end iterator
-            InputIterator() :
+            InputIterator() noexcept :
                 m_source(nullptr) {
             }
 
             InputIterator& operator++() {
                 assert(m_source);
                 assert(m_buffer);
-                assert(m_iter != nullptr);
+                assert(m_iter);
                 ++m_iter;
-                if (m_iter == m_buffer->end()) {
+                if (m_iter == m_buffer->end<TItem>()) {
                     update_buffer();
                 }
                 return *this;
@@ -108,23 +110,23 @@ namespace osmium {
                 return tmp;
             }
 
-            bool operator==(const InputIterator& rhs) const {
+            bool operator==(const InputIterator& rhs) const noexcept {
                 return m_source == rhs.m_source &&
                        m_buffer == rhs.m_buffer &&
                        m_iter == rhs.m_iter;
             }
 
-            bool operator!=(const InputIterator& rhs) const {
+            bool operator!=(const InputIterator& rhs) const noexcept {
                 return !(*this == rhs);
             }
 
             reference operator*() const {
-                assert(m_iter != osmium::memory::Buffer::iterator());
+                assert(m_iter);
                 return static_cast<reference>(*m_iter);
             }
 
             pointer operator->() const {
-                assert(m_iter != osmium::memory::Buffer::iterator());
+                assert(m_iter);
                 return &static_cast<reference>(*m_iter);
             }
 

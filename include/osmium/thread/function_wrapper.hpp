@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -40,13 +40,19 @@ namespace osmium {
 
     namespace thread {
 
+        /**
+         * This function wrapper can collect move-only functions unlike
+         * std::function which needs copyable functions.
+         * Taken from the book "C++ Concurrency in Action".
+         */
         class function_wrapper {
 
             struct impl_base {
+
+                virtual ~impl_base() = default;
                 virtual void call() = 0;
-                virtual ~impl_base() {
-                }
-            };
+
+            }; // struct impl_base
 
             std::unique_ptr<impl_base> impl;
 
@@ -58,13 +64,15 @@ namespace osmium {
                     m_functor(std::move(functor)) {
                 }
 
-                void call() {
+                void call() override {
                     m_functor();
                 }
-            };
+            }; // struct impl_type
 
         public:
 
+            // Constructor must not be "explicit" for wrapper
+            // to work seemlessly.
             template <typename F>
             function_wrapper(F&& f) :
                 impl(new impl_type<F>(std::move(f))) {

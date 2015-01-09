@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,7 +33,6 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <future>
 #include <memory>
 #include <string>
 #include <utility>
@@ -41,44 +40,16 @@ DEALINGS IN THE SOFTWARE.
 #include <osmium/io/compression.hpp>
 #include <osmium/io/detail/output_format.hpp>
 #include <osmium/io/detail/read_write.hpp>
+#include <osmium/io/detail/write_thread.hpp>
 #include <osmium/io/file.hpp>
 #include <osmium/io/header.hpp>
-#include <osmium/thread/checked_task.hpp>
-#include <osmium/thread/name.hpp>
+#include <osmium/io/overwrite.hpp>
+#include <osmium/memory/buffer.hpp>
+#include <osmium/thread/util.hpp>
 
 namespace osmium {
 
     namespace io {
-
-        class OutputThread {
-
-            typedef osmium::io::detail::data_queue_type data_queue_type;
-
-            data_queue_type& m_input_queue;
-            osmium::io::Compressor* m_compressor;
-
-        public:
-
-            OutputThread(data_queue_type& input_queue, osmium::io::Compressor* compressor) :
-                m_input_queue(input_queue),
-                m_compressor(compressor) {
-            }
-
-            void operator()() {
-                osmium::thread::set_thread_name("_osmium_output");
-
-                std::future<std::string> data_future;
-                std::string data;
-                do {
-                    m_input_queue.wait_and_pop(data_future);
-                    data = data_future.get();
-                    m_compressor->write(data);
-                } while (!data.empty());
-
-                m_compressor->close();
-            }
-
-        }; // class OutputThread
 
         /**
          * This is the user-facing interface for writing OSM files. Instantiate
@@ -90,12 +61,13 @@ namespace osmium {
 
             osmium::io::File m_file;
 
+            osmium::io::detail::data_queue_type m_output_queue;
+
             std::unique_ptr<osmium::io::detail::OutputFormat> m_output;
-            osmium::io::detail::data_queue_type m_output_queue {};
 
             std::unique_ptr<osmium::io::Compressor> m_compressor;
 
-            osmium::thread::CheckedTask<OutputThread> m_output_task;
+            std::future<bool> m_write_future;
 
         public:
 
@@ -107,23 +79,28 @@ namespace osmium {
              * @param header Optional header data. If this is not given sensible
              *               defaults will be used. See the default constructor
              *               of osmium::io::Header for details.
+             * @param allow_overwrite Allow overwriting of existing file? Can be
+             *               osmium::io::overwrite::allow or osmium::io::overwrite::no+
+             *               (default).
              *
              * @throws std::runtime_error If the file could not be opened.
              * @throws std::system_error If the file could not be opened.
              */
-            explicit Writer(const osmium::io::File& file, const osmium::io::Header& header = osmium::io::Header(), bool allow_overwrite=false) :
+            explicit Writer(const osmium::io::File& file, const osmium::io::Header& header = osmium::io::Header(), overwrite allow_overwrite = overwrite::no) :
                 m_file(file),
+                m_output_queue(20, "raw_output"), // XXX
                 m_output(osmium::io::detail::OutputFormatFactory::instance().create_output(m_file, m_output_queue)),
                 m_compressor(osmium::io::CompressionFactory::instance().create_compressor(file.compression(), osmium::io::detail::open_for_writing(m_file.filename(), allow_overwrite))),
-                m_output_task(OutputThread {m_output_queue, m_compressor.get()}) {
+                m_write_future(std::async(std::launch::async, detail::WriteThread(m_output_queue, m_compressor.get()))) {
+                assert(!m_file.buffer());
                 m_output->write_header(header);
             }
 
-            explicit Writer(const std::string& filename, const osmium::io::Header& header = osmium::io::Header(), bool allow_overwrite=false) :
+            explicit Writer(const std::string& filename, const osmium::io::Header& header = osmium::io::Header(), overwrite allow_overwrite = overwrite::no) :
                 Writer(osmium::io::File(filename), header, allow_overwrite) {
             }
 
-            explicit Writer(const char* filename, const osmium::io::Header& header = osmium::io::Header(), bool allow_overwrite=false) :
+            explicit Writer(const char* filename, const osmium::io::Header& header = osmium::io::Header(), overwrite allow_overwrite = overwrite::no) :
                 Writer(osmium::io::File(filename), header, allow_overwrite) {
             }
 
@@ -140,12 +117,14 @@ namespace osmium {
              * @throws Some form of std::runtime_error when there is a problem.
              */
             void operator()(osmium::memory::Buffer&& buffer) {
-                m_output_task.check_for_exception();
-                m_output->write_buffer(std::move(buffer));
+                osmium::thread::check_for_exception(m_write_future);
+                if (buffer.committed() > 0) {
+                    m_output->write_buffer(std::move(buffer));
+                }
             }
 
             /**
-             * Flush writes to output file and close it. If you do not
+             * Flush writes to output file and closes it. If you do not
              * call this, the destructor of Writer will also do the same
              * thing. But because this call might thrown an exception,
              * it is better to call close() explicitly.
@@ -154,7 +133,7 @@ namespace osmium {
              */
             void close() {
                 m_output->close();
-                m_output_task.close();
+                osmium::thread::wait_until_done(m_write_future);
             }
 
         }; // class Writer

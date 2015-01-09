@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,118 +33,290 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
+#include <osmium/geom/coordinates.hpp>
+#include <osmium/memory/collection.hpp>
+#include <osmium/memory/item.hpp>
+#include <osmium/osm/area.hpp>
+#include <osmium/osm/item_type.hpp>
 #include <osmium/osm/location.hpp>
 #include <osmium/osm/node.hpp>
+#include <osmium/osm/node_ref.hpp>
 #include <osmium/osm/way.hpp>
 
 namespace osmium {
 
     /**
-     * @brief Namespace for everything related to geometry.
+     * Exception thrown when an invalid geometry is encountered. An example
+     * would be a linestring with less than two points.
+     */
+    struct geometry_error : public std::runtime_error {
+
+        geometry_error(const std::string& what) :
+            std::runtime_error(what) {
+        }
+
+        geometry_error(const char* what) :
+            std::runtime_error(what) {
+        }
+
+    }; // struct geometry_error
+
+    /**
+     * @brief Everything related to geometry handling.
      */
     namespace geom {
 
-        struct geometry_error : public std::runtime_error {
-
-            geometry_error(const std::string& what) :
-                std::runtime_error(what) {
-            }
-
-            geometry_error(const char* what) :
-                std::runtime_error(what) {
-            }
-
-        };
+        /**
+         * Which nodes of a way to use for a linestring.
+         */
+        enum class use_nodes : bool {
+            unique = true, ///< Remove consecutive nodes with same location.
+            all    = false ///< Use all nodes.
+        }; // enum class use_nodes
 
         /**
-         * Abstract base class for geometry factories.
+         * Which direction the linestring created from a way
+         * should have.
          */
-        template <class G, class T>
-        class GeometryFactory {
+        enum class direction : bool {
+            backward = true, ///< Linestring has reverse direction.
+            forward  = false ///< Linestring has same direction as way.
+        }; // enum class direction
 
-        protected:
-
-            GeometryFactory<G, T>() {
-            }
+        /**
+         * This pseudo projection just returns its WGS84 input unchanged.
+         * Used as a template parameter if a real projection is not needed.
+         */
+        class IdentityProjection {
 
         public:
 
-            typedef typename T::point_type      point_type;
-            typedef typename T::linestring_type linestring_type;
-            typedef typename T::polygon_type    polygon_type;
+            Coordinates operator()(osmium::Location location) const {
+                return Coordinates{location.lon(), location.lat()};
+            }
 
-            point_type create_point(const osmium::Location location) {
-                if (location) {
-                    return static_cast<G*>(this)->make_point(location);
-                } else {
-                    throw geometry_error("location is undefined");
+            int epsg() const noexcept {
+                return 4326;
+            }
+
+            std::string proj_string() const {
+                return "+proj=longlat +datum=WGS84 +no_defs";
+            }
+
+        }; // class IdentityProjection
+
+        /**
+         * Geometry factory.
+         */
+        template <class TGeomImpl, class TProjection = IdentityProjection>
+        class GeometryFactory {
+
+            /**
+             * Add all points of an outer or inner ring to a multipolygon.
+             */
+            void add_points(const osmium::OuterRing& nodes) {
+                osmium::Location last_location;
+                for (const osmium::NodeRef& node_ref : nodes) {
+                    if (last_location != node_ref.location()) {
+                        last_location = node_ref.location();
+                        m_impl.multipolygon_add_location(m_projection(last_location));
+                    }
                 }
+            }
+
+            TProjection m_projection;
+            TGeomImpl m_impl;
+
+        public:
+
+            /**
+             * Constructor for default initialized projection.
+             */
+            template <class... TArgs>
+            GeometryFactory<TGeomImpl, TProjection>(TArgs&&... args) :
+                m_projection(),
+                m_impl(std::forward<TArgs>(args)...) {
+            }
+
+            /**
+             * Constructor for explicitly initialized projection. Note that the
+             * projection is moved into the GeometryFactory.
+             */
+            template <class... TArgs>
+            GeometryFactory<TGeomImpl, TProjection>(TProjection&& projection, TArgs&&... args) :
+                m_projection(std::move(projection)),
+                m_impl(std::forward<TArgs>(args)...) {
+            }
+
+            typedef typename TGeomImpl::point_type        point_type;
+            typedef typename TGeomImpl::linestring_type   linestring_type;
+            typedef typename TGeomImpl::polygon_type      polygon_type;
+            typedef typename TGeomImpl::multipolygon_type multipolygon_type;
+            typedef typename TGeomImpl::ring_type         ring_type;
+
+            int epsg() const {
+                return m_projection.epsg();
+            }
+
+            std::string proj_string() const {
+                return m_projection.proj_string();
+            }
+
+            /* Point */
+
+            point_type create_point(const osmium::Location location) const {
+                return m_impl.make_point(m_projection(location));
             }
 
             point_type create_point(const osmium::Node& node) {
                 return create_point(node.location());
             }
 
-            point_type create_point(const osmium::WayNode& way_node) {
-                return create_point(way_node.location());
+            point_type create_point(const osmium::NodeRef& node_ref) {
+                return create_point(node_ref.location());
             }
 
-            linestring_type create_linestring(const osmium::WayNodeList& wnl, bool unique=true, bool reverse=false) {
-                static_cast<G*>(this)->linestring_start();
+            /* LineString */
 
-                if (unique) {
+            void linestring_start() {
+                m_impl.linestring_start();
+            }
+
+            template <class TIter>
+            size_t fill_linestring(TIter it, TIter end) {
+                size_t num_points = 0;
+                for (; it != end; ++it, ++num_points) {
+                    m_impl.linestring_add_location(m_projection(it->location()));
+                }
+                return num_points;
+            }
+
+            template <class TIter>
+            size_t fill_linestring_unique(TIter it, TIter end) {
+                size_t num_points = 0;
+                osmium::Location last_location;
+                for (; it != end; ++it) {
+                    if (last_location != it->location()) {
+                        last_location = it->location();
+                        m_impl.linestring_add_location(m_projection(last_location));
+                        ++num_points;
+                    }
+                }
+                return num_points;
+            }
+
+            linestring_type linestring_finish(size_t num_points) {
+                return m_impl.linestring_finish(num_points);
+            }
+
+            linestring_type create_linestring(const osmium::WayNodeList& wnl, use_nodes un=use_nodes::unique, direction dir=direction::forward) {
+                linestring_start();
+                size_t num_points = 0;
+
+                if (un == use_nodes::unique) {
                     osmium::Location last_location;
-                    if (reverse) {
-                        for (int i = wnl.size()-1; i >= 0; --i) {
-                            if (last_location != wnl[i].location()) {
-                                last_location = wnl[i].location();
-                                if (last_location) {
-                                    static_cast<G*>(this)->linestring_add_location(last_location);
-                                } else {
-                                    throw geometry_error("location is undefined");
-                                }
-                            }
-                        }
-                    } else {
-                        for (auto& wn : wnl) {
-                            if (last_location != wn.location()) {
-                                last_location = wn.location();
-                                if (last_location) {
-                                    static_cast<G*>(this)->linestring_add_location(last_location);
-                                } else {
-                                    throw geometry_error("location is undefined");
-                                }
-                            }
-                        }
+                    switch (dir) {
+                        case direction::forward:
+                            num_points = fill_linestring_unique(wnl.cbegin(), wnl.cend());
+                            break;
+                        case direction::backward:
+                            num_points = fill_linestring_unique(wnl.crbegin(), wnl.crend());
+                            break;
                     }
                 } else {
-                    if (reverse) {
-                        for (int i = wnl.size()-1; i >= 0; --i) {
-                            if (wnl[i].location()) {
-                                static_cast<G*>(this)->linestring_add_location(wnl[i].location());
-                            } else {
-                                throw geometry_error("location is undefined");
-                            }
-                        }
-                    } else {
-                        for (auto& wn : wnl) {
-                            if (wn.location()) {
-                                static_cast<G*>(this)->linestring_add_location(wn.location());
-                            } else {
-                                throw geometry_error("location is undefined");
-                            }
-                        }
+                    switch (dir) {
+                        case direction::forward:
+                            num_points = fill_linestring(wnl.cbegin(), wnl.cend());
+                            break;
+                        case direction::backward:
+                            num_points = fill_linestring(wnl.crbegin(), wnl.crend());
+                            break;
                     }
                 }
 
-                return static_cast<G*>(this)->linestring_finish();
+                if (num_points < 2) {
+                    throw osmium::geometry_error("not enough points for linestring");
+                }
+
+                return linestring_finish(num_points);
             }
 
-            linestring_type create_linestring(const osmium::Way& way, bool unique=true, bool reverse=false) {
-                return create_linestring(way.nodes(), unique, reverse);
+            linestring_type create_linestring(const osmium::Way& way, use_nodes un=use_nodes::unique, direction dir=direction::forward) {
+                return create_linestring(way.nodes(), un, dir);
+            }
+
+            /* Polygon */
+
+            void polygon_start() {
+                m_impl.polygon_start();
+            }
+
+            template <class TIter>
+            size_t fill_polygon(TIter it, TIter end) {
+                size_t num_points = 0;
+                for (; it != end; ++it, ++num_points) {
+                    m_impl.polygon_add_location(m_projection(it->location()));
+                }
+                return num_points;
+            }
+
+            template <class TIter>
+            size_t fill_polygon_unique(TIter it, TIter end) {
+                size_t num_points = 0;
+                osmium::Location last_location;
+                for (; it != end; ++it) {
+                    if (last_location != it->location()) {
+                        last_location = it->location();
+                        m_impl.polygon_add_location(m_projection(last_location));
+                        ++num_points;
+                    }
+                }
+                return num_points;
+            }
+
+            polygon_type polygon_finish(size_t num_points) {
+                return m_impl.polygon_finish(num_points);
+            }
+
+            /* MultiPolygon */
+
+            multipolygon_type create_multipolygon(const osmium::Area& area) {
+                size_t num_polygons = 0;
+                size_t num_rings = 0;
+                m_impl.multipolygon_start();
+
+                for (auto it = area.cbegin(); it != area.cend(); ++it) {
+                    const osmium::OuterRing& ring = static_cast<const osmium::OuterRing&>(*it);
+                    if (it->type() == osmium::item_type::outer_ring) {
+                        if (num_polygons > 0) {
+                            m_impl.multipolygon_polygon_finish();
+                        }
+                        m_impl.multipolygon_polygon_start();
+                        m_impl.multipolygon_outer_ring_start();
+                        add_points(ring);
+                        m_impl.multipolygon_outer_ring_finish();
+                        ++num_rings;
+                        ++num_polygons;
+                    } else if (it->type() == osmium::item_type::inner_ring) {
+                        m_impl.multipolygon_inner_ring_start();
+                        add_points(ring);
+                        m_impl.multipolygon_inner_ring_finish();
+                        ++num_rings;
+                    }
+                }
+
+                // if there are no rings, this area is invalid
+                if (num_rings == 0) {
+                    throw osmium::geometry_error("invalid area");
+                }
+
+                m_impl.multipolygon_polygon_finish();
+                return m_impl.multipolygon_finish();
             }
 
         }; // class GeometryFactory

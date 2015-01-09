@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -60,10 +60,10 @@ namespace osmium {
             *
             * This will only work on 64 bit machines.
             */
-            template <typename TKey, typename TValue>
-            class SparseTable : public osmium::index::map::Map<TKey, TValue> {
+            template <typename TId, typename TValue>
+            class SparseTable : public osmium::index::map::Map<TId, TValue> {
 
-                TKey m_grow_size;
+                TId m_grow_size;
 
                 google::sparsetable<TValue> m_elements;
 
@@ -79,26 +79,26 @@ namespace osmium {
                 *                  The storage will grow by at least this size
                 *                  every time it runs out of space.
                 */
-                SparseTable(const TKey grow_size=10000) :
+                explicit SparseTable(const TId grow_size=10000) :
                     m_grow_size(grow_size),
                     m_elements(grow_size) {
                 }
 
                 ~SparseTable() override final = default;
 
-                void set(const TKey id, const TValue value) override final {
+                void set(const TId id, const TValue value) override final {
                     if (id >= m_elements.size()) {
                         m_elements.resize(id + m_grow_size);
                     }
                     m_elements[id] = value;
                 }
 
-                const TValue get(const TKey id) const override final {
+                const TValue get(const TId id) const override final {
                     if (id >= m_elements.size()) {
-                        throw std::out_of_range("Unknown ID");
+                        not_found_error(id);
                     }
-                    if (m_elements[id] == TValue()) {
-                        throw std::out_of_range("Unknown ID");
+                    if (m_elements[id] == osmium::index::empty_value<TValue>()) {
+                        not_found_error(id);
                     }
                     return m_elements[id];
                 }
@@ -117,16 +117,16 @@ namespace osmium {
                     m_elements.clear();
                 }
 
-                void dump_as_list(const int fd) const {
-                    std::vector<std::pair<TKey, TValue>> v;
+                void dump_as_list(const int fd) const override final {
+                    std::vector<std::pair<TId, TValue>> v;
                     int n=0;
                     for (const TValue value : m_elements) {
-                        if (value != TValue()) {
-                            v.push_back(std::make_pair(n, value));
+                        if (value != osmium::index::empty_value<TValue>()) {
+                            v.emplace_back(n, value);
                         }
                         ++n;
                     }
-                    osmium::io::detail::reliable_write(fd, reinterpret_cast<const char*>(v.data()), sizeof(std::pair<TKey, TValue>) * v.size());
+                    osmium::io::detail::reliable_write(fd, reinterpret_cast<const char*>(v.data()), sizeof(std::pair<TId, TValue>) * v.size());
                 }
 
             }; // class SparseTable

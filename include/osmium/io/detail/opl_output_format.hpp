@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -48,10 +48,20 @@ DEALINGS IN THE SOFTWARE.
 
 #include <boost/version.hpp>
 
+#ifdef __clang__
+# pragma clang diagnostic push
+# pragma clang diagnostic ignored "-Wmissing-noreturn"
+# pragma clang diagnostic ignored "-Wsign-conversion"
+#endif
+
 #if BOOST_VERSION >= 104800
 # include <boost/regex/pending/unicode_iterator.hpp>
 #else
 # include <boost_unicode_iterator.hpp>
+#endif
+
+#ifdef __clang__
+# pragma clang diagnostic pop
 #endif
 
 #include <osmium/handler.hpp>
@@ -85,13 +95,27 @@ namespace osmium {
              */
             class OPLOutputBlock : public osmium::handler::Handler {
 
-                static const size_t tmp_buffer_size = 100;
+                static constexpr size_t tmp_buffer_size = 100;
 
                 osmium::memory::Buffer m_input_buffer;
 
                 std::string m_out;
 
                 char m_tmp_buffer[tmp_buffer_size+1];
+
+                template <typename... TArgs>
+                void output_formatted(const char* format, TArgs&&... args) {
+#ifndef NDEBUG
+                    int len =
+#endif
+#ifndef _MSC_VER
+                    snprintf(m_tmp_buffer, tmp_buffer_size, format, std::forward<TArgs>(args)...);
+#else
+                    _snprintf(m_tmp_buffer, tmp_buffer_size, format, std::forward<TArgs>(args)...);
+#endif
+                    assert(len > 0 && static_cast<size_t>(len) < tmp_buffer_size);
+                    m_out += m_tmp_buffer;
+                }
 
                 void append_encoded_string(const std::string& data) {
                     boost::u8_to_u32_iterator<std::string::const_iterator> it(data.cbegin(), data.cbegin(), data.cend());
@@ -117,25 +141,21 @@ namespace osmium {
                             *oit = c;
                         } else {
                             m_out += '%';
-                            snprintf(m_tmp_buffer, tmp_buffer_size, "%04x", c);
-                            m_out += m_tmp_buffer;
+                            output_formatted("%04x", c);
                         }
                     }
                 }
 
-                void write_meta(const osmium::Object& object) {
-                    snprintf(m_tmp_buffer, tmp_buffer_size, "%" PRId64 " v%d d", object.id(), object.version());
-                    m_out += m_tmp_buffer;
+                void write_meta(const osmium::OSMObject& object) {
+                    output_formatted("%" PRId64 " v%d d", object.id(), object.version());
                     m_out += (object.visible() ? 'V' : 'D');
-                    snprintf(m_tmp_buffer, tmp_buffer_size, " c%d t", object.changeset());
-                    m_out += m_tmp_buffer;
+                    output_formatted(" c%d t", object.changeset());
                     m_out += object.timestamp().to_iso();
-                    snprintf(m_tmp_buffer, tmp_buffer_size, " i%d u", object.uid());
-                    m_out += m_tmp_buffer;
+                    output_formatted(" i%d u", object.uid());
                     append_encoded_string(object.user());
                     m_out += " T";
                     bool first = true;
-                    for (auto& tag : object.tags()) {
+                    for (const auto& tag : object.tags()) {
                         if (first) {
                             first = false;
                         } else {
@@ -149,8 +169,7 @@ namespace osmium {
 
                 void write_location(const osmium::Location location, const char x, const char y) {
                     if (location) {
-                        snprintf(m_tmp_buffer, tmp_buffer_size, " %c%.7f %c%.7f", x, location.lon(), y, location.lat());
-                        m_out += m_tmp_buffer;
+                        output_formatted(" %c%.7f %c%.7f", x, location.lon_without_check(), y, location.lat_without_check());
                     } else {
                         m_out += ' ';
                         m_out += x;
@@ -161,7 +180,7 @@ namespace osmium {
 
             public:
 
-                OPLOutputBlock(osmium::memory::Buffer&& buffer) :
+                explicit OPLOutputBlock(osmium::memory::Buffer&& buffer) :
                     m_input_buffer(std::move(buffer)),
                     m_out(),
                     m_tmp_buffer() {
@@ -170,8 +189,8 @@ namespace osmium {
                 OPLOutputBlock(const OPLOutputBlock&) = delete;
                 OPLOutputBlock& operator=(const OPLOutputBlock&) = delete;
 
-                OPLOutputBlock(OPLOutputBlock&& other) = default;
-                OPLOutputBlock& operator=(OPLOutputBlock&& other) = default;
+                OPLOutputBlock(OPLOutputBlock&&) = default;
+                OPLOutputBlock& operator=(OPLOutputBlock&&) = default;
 
                 std::string operator()() {
                     osmium::apply(m_input_buffer.cbegin(), m_input_buffer.cend(), *this);
@@ -194,14 +213,13 @@ namespace osmium {
 
                     m_out += " N";
                     bool first = true;
-                    for (const auto& wn : way.nodes()) {
+                    for (const auto& node_ref : way.nodes()) {
                         if (first) {
                             first = false;
                         } else {
                             m_out += ',';
                         }
-                        snprintf(m_tmp_buffer, tmp_buffer_size, "n%" PRId64, wn.ref());
-                        m_out += m_tmp_buffer;
+                        output_formatted("n%" PRId64, node_ref.ref());
                     }
                     m_out += '\n';
                 }
@@ -219,27 +237,24 @@ namespace osmium {
                             m_out += ',';
                         }
                         m_out += item_type_to_char(member.type());
-                        snprintf(m_tmp_buffer, tmp_buffer_size, "%" PRId64 "@", member.ref());
-                        m_out += m_tmp_buffer;
+                        output_formatted("%" PRId64 "@", member.ref());
                         m_out += member.role();
                     }
                     m_out += '\n';
                 }
 
                 void changeset(const osmium::Changeset& changeset) {
-                    snprintf(m_tmp_buffer, tmp_buffer_size, "c%d k%d s", changeset.id(), changeset.num_changes());
-                    m_out += m_tmp_buffer;
+                    output_formatted("c%d k%d s", changeset.id(), changeset.num_changes());
                     m_out += changeset.created_at().to_iso();
                     m_out += " e";
                     m_out += changeset.closed_at().to_iso();
-                    snprintf(m_tmp_buffer, tmp_buffer_size, " i%d u", changeset.uid());
-                    m_out += m_tmp_buffer;
+                    output_formatted(" i%d u", changeset.uid());
                     append_encoded_string(changeset.user());
                     write_location(changeset.bounds().bottom_left(), 'x', 'y');
                     write_location(changeset.bounds().top_right(), 'X', 'Y');
                     m_out += " T";
                     bool first = true;
-                    for (auto& tag : changeset.tags()) {
+                    for (const auto& tag : changeset.tags()) {
                         if (first) {
                             first = false;
                         } else {
@@ -267,11 +282,7 @@ namespace osmium {
                 }
 
                 void write_buffer(osmium::memory::Buffer&& buffer) override final {
-                    OPLOutputBlock output_block(std::move(buffer));
-                    m_output_queue.push(osmium::thread::Pool::instance().submit(std::move(output_block)));
-                    while (m_output_queue.size() > 10) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // XXX
-                    }
+                    m_output_queue.push(osmium::thread::Pool::instance().submit(OPLOutputBlock{std::move(buffer)}));
                 }
 
                 void close() override final {
@@ -285,10 +296,13 @@ namespace osmium {
 
             namespace {
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
                 const bool registered_opl_output = osmium::io::detail::OutputFormatFactory::instance().register_output_format(osmium::io::file_format::opl,
                     [](const osmium::io::File& file, data_queue_type& output_queue) {
                         return new osmium::io::detail::OPLOutputFormat(file, output_queue);
                 });
+#pragma GCC diagnostic pop
 
             } // anonymous namespace
 

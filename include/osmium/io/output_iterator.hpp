@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -53,36 +53,38 @@ namespace osmium {
         class OutputIterator : public std::iterator<std::output_iterator_tag, osmium::memory::Item> {
 
             struct buffer_wrapper {
+
                 osmium::memory::Buffer buffer;
 
                 buffer_wrapper(size_t buffer_size) :
-                    buffer(buffer_size, false) {
+                    buffer(buffer_size, osmium::memory::Buffer::auto_grow::no) {
                 }
-            };
 
-            static const int default_buffer_size = 10 * 1024 * 1024;
+            }; // struct buffer_wrapper
 
-            TDest& m_destination;
+            static constexpr size_t default_buffer_size = 10 * 1024 * 1024;
+
+            TDest* m_destination;
 
             std::shared_ptr<buffer_wrapper> m_buffer_wrapper;
 
         public:
 
-            OutputIterator(TDest& destination, const size_t buffer_size = default_buffer_size) :
-                m_destination(destination),
+            explicit OutputIterator(TDest& destination, const size_t buffer_size = default_buffer_size) :
+                m_destination(&destination),
                 m_buffer_wrapper(std::make_shared<buffer_wrapper>(buffer_size)) {
             }
 
             void flush() {
-                osmium::memory::Buffer buffer(m_buffer_wrapper->buffer.capacity(), false);
+                osmium::memory::Buffer buffer(m_buffer_wrapper->buffer.capacity(), osmium::memory::Buffer::auto_grow::no);
                 std::swap(m_buffer_wrapper->buffer, buffer);
-                m_destination(std::move(buffer));
+                (*m_destination)(std::move(buffer));
             }
 
             OutputIterator& operator=(const osmium::memory::Item& item) {
                 try {
                     m_buffer_wrapper->buffer.push_back(item);
-                } catch (osmium::memory::BufferIsFull&) {
+                } catch (osmium::buffer_is_full&) {
                     flush();
                     m_buffer_wrapper->buffer.push_back(item);
                 }

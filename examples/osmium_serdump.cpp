@@ -15,6 +15,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#ifdef _MSC_VER
+# include <direct.h>
+#endif
+
 #include <osmium/io/pbf_input.hpp>
 #include <osmium/io/xml_input.hpp>
 #include <osmium/handler/disk_store.hpp>
@@ -81,8 +85,11 @@ int main(int argc, char* argv[]) {
     }
 
     std::string dir(argv[optind+1]);
-
+#ifndef _WIN32
     int result = ::mkdir(dir.c_str(), 0777);
+#else
+    int result = mkdir(dir.c_str());
+#endif
     if (result == -1 && errno != EEXIST) {
         std::cerr << "Problem creating directory '" << dir << "': " << strerror(errno) << "\n";
         exit(2);
@@ -114,6 +121,8 @@ int main(int argc, char* argv[]) {
         disk_store_handler(buffer); // XXX
         osmium::apply(buffer, object_relations_handler);
     }
+
+    reader.close();
 
     {
         std::string index_file(dir + "/nodes.idx");

@@ -11,8 +11,14 @@
 #include <getopt.h>
 
 #pragma GCC diagnostic push
+#ifdef __clang__
+# pragma GCC diagnostic ignored "-Wdocumentation-unknown-command"
+#endif
+#pragma GCC diagnostic ignored "-Wfloat-equal"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
+#pragma GCC diagnostic ignored "-Wpadded"
 #pragma GCC diagnostic ignored "-Wredundant-decls"
+#pragma GCC diagnostic ignored "-Wshadow"
 # include <ogr_api.h>
 # include <ogrsf_frmts.h>
 #pragma GCC diagnostic pop
@@ -44,7 +50,7 @@ class MyOGRHandler : public osmium::handler::Handler {
     OGRLayer* m_layer_point;
     OGRLayer* m_layer_linestring;
 
-    osmium::geom::OGRFactory m_factory {};
+    osmium::geom::OGRFactory<> m_factory;
 
 public:
 
@@ -120,6 +126,8 @@ public:
     }
 
     ~MyOGRHandler() {
+        m_layer_linestring->CommitTransaction();
+        m_layer_point->CommitTransaction();
         OGRDataSource::DestroyDataSource(m_data_source);
         OGRCleanupAll();
     }
@@ -142,10 +150,6 @@ public:
         }
     }
 
-    void after_nodes() {
-        m_layer_point->CommitTransaction();
-    }
-
     void way(const osmium::Way& way) {
         const char* highway = way.tags().get_value_by_key("highway");
         if (highway) {
@@ -162,14 +166,10 @@ public:
                 }
 
                 OGRFeature::DestroyFeature(feature);
-            } catch (osmium::geom::geometry_error&) {
+            } catch (osmium::geometry_error&) {
                 std::cerr << "Ignoring illegal geometry for way " << way.id() << ".\n";
             }
         }
-    }
-
-    void after_ways() {
-        m_layer_linestring->CommitTransaction();
     }
 
 };
@@ -237,6 +237,7 @@ int main(int argc, char* argv[]) {
     MyOGRHandler ogr_handler(output_format, output_filename);
 
     osmium::apply(reader, location_handler, ogr_handler);
+    reader.close();
 
     google::protobuf::ShutdownProtobufLibrary();
 

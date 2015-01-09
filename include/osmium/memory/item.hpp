@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,23 +35,33 @@ DEALINGS IN THE SOFTWARE.
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 namespace osmium {
 
     // forward declaration, see osmium/osm/item_type.hpp for declaration
-    enum class item_type : uint32_t;
+    enum class item_type : uint16_t;
+
+    namespace builder {
+        class Builder;
+    }
 
     namespace memory {
 
-        // align datastructures to this many bytes
-        constexpr size_t align_bytes = 8;
+        typedef uint32_t item_size_type;
 
-        inline size_t padded_length(size_t length) {
+        // align datastructures to this many bytes
+        constexpr item_size_type align_bytes = 8;
+
+        template <typename T>
+        inline T padded_length(T length) noexcept {
+            static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value,
+                          "Template parameter must be unsigned integral type");
             return (length + align_bytes - 1) & ~(align_bytes - 1);
         }
 
         /**
-         * @brief Internal namespace.
+         * @brief Namespace for Osmium internal use
          */
         namespace detail {
 
@@ -75,55 +85,45 @@ namespace osmium {
 
             public:
 
-                unsigned char* data() {
+                unsigned char* data() noexcept {
                     return reinterpret_cast<unsigned char*>(this);
                 }
 
-                const unsigned char* data() const {
+                const unsigned char* data() const noexcept {
                     return reinterpret_cast<const unsigned char*>(this);
                 }
 
-            };
+            }; // class ItemHelper
 
         } // namespace detail
-
-        class Builder;
-
-        typedef uint32_t item_size_type;
 
         class Item : public osmium::memory::detail::ItemHelper {
 
             item_size_type m_size;
             item_type m_type;
+            uint16_t m_removed : 1;
+            uint16_t m_padding : 15;
 
             template <class TMember>
             friend class CollectionIterator;
 
-            friend class Builder;
+            template <class TMember>
+            friend class ItemIterator;
 
-            unsigned char* next() {
-                return data() + padded_size();
-            }
+            friend class osmium::builder::Builder;
 
-            const unsigned char* next() const {
-                return data() + padded_size();
-            }
-
-            Item& add_size(const item_size_type size) {
+            Item& add_size(const item_size_type size) noexcept {
                 m_size += size;
-                return *this;
-            }
-
-            Item& type(const item_type item_type) {
-                m_type = item_type;
                 return *this;
             }
 
         protected:
 
-            Item(item_size_type size=0, item_type type=item_type()) :
+            explicit Item(item_size_type size=0, item_type type=item_type()) noexcept :
                 m_size(size),
-                m_type(type) {
+                m_type(type),
+                m_removed(false),
+                m_padding(0) {
             }
 
             Item(const Item&) = delete;
@@ -132,9 +132,22 @@ namespace osmium {
             Item& operator=(const Item&) = delete;
             Item& operator=(Item&&) = delete;
 
+            Item& set_type(const item_type item_type) noexcept {
+                m_type = item_type;
+                return *this;
+            }
+
         public:
 
-            item_size_type byte_size() const {
+            unsigned char* next() noexcept {
+                return data() + padded_size();
+            }
+
+            const unsigned char* next() const noexcept {
+                return data() + padded_size();
+            }
+
+            item_size_type byte_size() const noexcept {
                 return m_size;
             }
 
@@ -142,12 +155,21 @@ namespace osmium {
                 return padded_length(m_size);
             }
 
-            item_type type() const {
+            item_type type() const noexcept {
                 return m_type;
+            }
+
+            bool removed() const noexcept {
+                return m_removed;
+            }
+
+            void set_removed(bool removed) noexcept {
+                m_removed = removed;
             }
 
         }; // class Item
 
+        static_assert(sizeof(Item) == 8, "Class osmium::Item has wrong size!");
         static_assert(sizeof(Item) % align_bytes == 0, "Class osmium::Item has wrong size to be aligned properly!");
 
     } // namespace memory

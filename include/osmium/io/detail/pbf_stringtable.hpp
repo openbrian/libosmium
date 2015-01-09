@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -34,14 +34,16 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include <algorithm>
+#include <cstdint>
 #include <iterator>
 #include <map>
-#include <stdint.h>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <osmpbf/osmpbf.h>
+
+#include <osmium/util/cast.hpp>
 
 namespace osmium {
 
@@ -59,8 +61,12 @@ namespace osmium {
              */
             class StringTable {
 
+            public:
+
                 /// type for string IDs (interim and final)
                 typedef uint16_t string_id_type;
+
+            private:
 
                 /**
                  * this is the struct used to build the StringTable. It is stored as
@@ -79,19 +85,21 @@ namespace osmium {
                  * IDs means less used space in the resulting file.
                  */
                 struct string_info {
+
                     /// number of occurrences of this string
                     uint16_t count;
 
                     /// an intermediate-id
                     string_id_type interim_id;
-                };
+
+                }; // struct string_info
 
                 /**
                  * Interim StringTable, storing all strings that should be written to
                  * the StringTable once the block is written to disk.
                  */
-                typedef std::map<std::string, string_info> string2string_info_t;
-                string2string_info_t m_strings;
+                typedef std::map<std::string, string_info> string2string_info_type;
+                string2string_info_type m_strings;
 
                 /**
                  * This vector is used to map the interim IDs to real StringTable IDs after
@@ -100,14 +108,11 @@ namespace osmium {
                 typedef std::vector<string_id_type> interim_id2id_type;
                 interim_id2id_type m_id2id_map;
 
-                int m_size;
+                size_t m_size = 0;
 
             public:
 
-                StringTable() :
-                    m_strings(),
-                    m_id2id_map(),
-                    m_size(0) {
+                StringTable() {
                 }
 
                 friend bool operator<(const string_info& lhs, const string_info& rhs) {
@@ -121,7 +126,8 @@ namespace osmium {
                 string_id_type record_string(const std::string& string) {
                     string_info& info = m_strings[string];
                     if (info.interim_id == 0) {
-                        info.interim_id = ++m_size;
+                        ++m_size;
+                        info.interim_id = static_cast_with_assert<string_id_type>(m_size);
                     } else {
                         info.count++;
                     }
@@ -155,7 +161,7 @@ namespace osmium {
                                         return std::pair<string_info, std::string>(p.second, p.first);
                                 });
 
-                    int n=0;
+                    string_id_type n=0;
 
                     for (const auto& mapping : sortedbycount) {
                         // add the string of the current item to the pbf StringTable
@@ -171,6 +177,11 @@ namespace osmium {
                  */
                 string_id_type map_string_id(const string_id_type interim_id) const {
                     return m_id2id_map[interim_id];
+                }
+
+                template <typename T>
+                string_id_type map_string_id(const T interim_id) const {
+                    return map_string_id(static_cast_with_assert<string_id_type>(interim_id));
                 }
 
                 /**

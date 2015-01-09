@@ -88,12 +88,14 @@ int main(int argc, char* argv[]) {
         std::cerr << "Warning! You are converting from an OSM file with (potentially) several versions of the same object to one that is not marked as such.\n";
     }
 
+    int exit_code = 0;
+
     try {
         osmium::io::Reader reader(infile);
         osmium::io::Header header = reader.header();
         header.set("generator", "osmium_convert");
 
-        osmium::io::Writer writer(outfile, header, true);
+        osmium::io::Writer writer(outfile, header, osmium::io::overwrite::allow);
         while (osmium::memory::Buffer buffer = reader.read()) {
             writer(std::move(buffer));
         }
@@ -101,9 +103,10 @@ int main(int argc, char* argv[]) {
         reader.close();
     } catch (std::exception& e) {
         std::cerr << e.what() << "\n";
-        exit(1);
+        exit_code = 1;
     }
 
     google::protobuf::ShutdownProtobufLibrary();
+    return exit_code;
 }
 

@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,6 +35,7 @@ DEALINGS IN THE SOFTWARE.
 
 #include <osmium/handler.hpp>
 #include <osmium/index/multimap.hpp>
+#include <osmium/osm/node_ref.hpp>
 #include <osmium/osm/item_type.hpp>
 #include <osmium/osm/relation.hpp>
 #include <osmium/osm/types.hpp>
@@ -60,7 +61,7 @@ namespace osmium {
 
         public:
 
-            ObjectRelations(index_type& n2w, index_type& n2r, index_type& w2r, index_type& r2r) :
+            explicit ObjectRelations(index_type& n2w, index_type& n2r, index_type& w2r, index_type& r2r) :
                 m_index_n2w(n2w),
                 m_index_n2r(n2r),
                 m_index_w2r(w2r),
@@ -73,13 +74,13 @@ namespace osmium {
             ~ObjectRelations() noexcept = default;
 
             void way(const osmium::Way& way) {
-                for (auto& wn : way.nodes()) {
-                    m_index_n2w.set(wn.positive_ref(), way.positive_id());
+                for (const auto& node_ref : way.nodes()) {
+                    m_index_n2w.set(node_ref.positive_ref(), way.positive_id());
                 }
             }
 
             void relation(const osmium::Relation& relation) {
-                for (auto& member : relation.members()) {
+                for (const auto& member : relation.members()) {
                     switch (member.type()) {
                         case osmium::item_type::node:
                             m_index_n2r.set(member.positive_ref(), relation.positive_id());

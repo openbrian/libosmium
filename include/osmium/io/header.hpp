@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -61,7 +61,7 @@ namespace osmium {
 
             Header() = default;
 
-            Header(std::initializer_list<osmium::util::Options::value_type> values) :
+            explicit Header(const std::initializer_list<osmium::util::Options::value_type>& values) :
                 Options(values) {
             }
 
@@ -73,15 +73,15 @@ namespace osmium {
 
             ~Header() = default;
 
-            std::vector<osmium::Box>& boxes() {
+            std::vector<osmium::Box>& boxes() noexcept {
                 return m_boxes;
             }
 
-            const std::vector<osmium::Box>& boxes() const {
+            const std::vector<osmium::Box>& boxes() const noexcept {
                 return m_boxes;
             }
 
-            Header& boxes(const std::vector<osmium::Box>& boxes) {
+            Header& boxes(const std::vector<osmium::Box>& boxes) noexcept {
                 m_boxes = boxes;
                 return *this;
             }
@@ -92,7 +92,7 @@ namespace osmium {
 
             osmium::Box joined_boxes() const {
                 osmium::Box box;
-                for (auto& b : m_boxes) {
+                for (const auto& b : m_boxes) {
                     box.extend(b.bottom_left());
                     box.extend(b.top_right());
                 }
@@ -104,12 +104,12 @@ namespace osmium {
                 return *this;
             }
 
-            bool has_multiple_object_versions() const {
+            bool has_multiple_object_versions() const noexcept {
                 return m_has_multiple_object_versions;
             }
 
-            Header& has_multiple_object_versions(bool h) {
-                m_has_multiple_object_versions = h;
+            Header& set_has_multiple_object_versions(bool value) noexcept {
+                m_has_multiple_object_versions = value;
                 return *this;
             }
 

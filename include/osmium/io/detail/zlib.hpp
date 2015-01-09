@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,8 +33,7 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#define OSMIUM_LINK_WITH_LIBS_ZLIB -lz
-
+#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -50,7 +49,7 @@ namespace osmium {
              * Compress data using zlib.
              *
              * @param input Data to compress.
-             * @return Compressed data.
+             * @returns Compressed data.
              */
             inline std::string zlib_compress(const std::string& input) {
                 unsigned long output_size = ::compressBound(input.size());
@@ -74,12 +73,12 @@ namespace osmium {
              *
              * @param input Compressed input data.
              * @param raw_size Size of uncompressed data.
-             * @return Uncompressed data.
+             * @returns Uncompressed data.
              */
-            inline std::string zlib_uncompress(const std::string& input, unsigned long raw_size) {
-                std::string output(raw_size, '\0');
+            inline std::unique_ptr<std::string> zlib_uncompress(const std::string& input, unsigned long raw_size) {
+                auto output = std::unique_ptr<std::string>(new std::string(raw_size, '\0'));
 
-                if (::uncompress(reinterpret_cast<unsigned char*>(const_cast<char *>(output.data())),
+                if (::uncompress(reinterpret_cast<unsigned char*>(const_cast<char *>(output->data())),
                                  &raw_size,
                                  reinterpret_cast<const unsigned char*>(input.data()),
                                  input.size()) != Z_OK) {

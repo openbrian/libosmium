@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,9 +33,12 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#include <cmath>
 #include <iterator>
 
-#include <osmium/osm/location.hpp>
+#include <osmium/geom/coordinates.hpp>
+#include <osmium/geom/util.hpp>
+#include <osmium/osm/node_ref.hpp>
 #include <osmium/osm/way.hpp>
 
 namespace osmium {
@@ -52,28 +55,19 @@ namespace osmium {
          */
         namespace haversine {
 
-            /// @brief The usual PI/180 constant
-            constexpr double DEG_TO_RAD = 0.017453292519943295769236907684886;
-
             /// @brief Earth's quadratic mean radius for WGS84
             constexpr double EARTH_RADIUS_IN_METERS = 6372797.560856;
 
-            inline double distance(const double x1, const double y1, const double x2, const double y2) {
-                const double lon_arc = (x1 - x2) * DEG_TO_RAD;
-                const double lat_arc = (y1 - y2) * DEG_TO_RAD;
-                double lonh = sin(lon_arc * 0.5);
-                lonh *= lonh;
-                double lath = sin(lat_arc * 0.5);
-                lath *= lath;
-                const double tmp = cos(y1 * DEG_TO_RAD) * cos(y2 * DEG_TO_RAD);
-                return 2.0 * EARTH_RADIUS_IN_METERS * asin(sqrt(lath + tmp*lonh));
-            }
-
             /**
-             * Calculate distance in meters between two locations.
+             * Calculate distance in meters between two sets of coordinates.
              */
-            inline double distance(const osmium::Location& from, const osmium::Location& to) {
-                return distance(from.lon(), from.lat(), to.lon(), to.lat());
+            inline double distance(const osmium::geom::Coordinates& c1, const osmium::geom::Coordinates& c2) {
+                double lonh = sin(deg_to_rad(c1.x - c2.x) * 0.5);
+                lonh *= lonh;
+                double lath = sin(deg_to_rad(c1.y - c2.y) * 0.5);
+                lath *= lath;
+                const double tmp = cos(deg_to_rad(c1.y)) * cos(deg_to_rad(c2.y));
+                return 2.0 * EARTH_RADIUS_IN_METERS * asin(sqrt(lath + tmp*lonh));
             }
 
             /**

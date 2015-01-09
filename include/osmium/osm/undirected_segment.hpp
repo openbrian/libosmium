@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,7 +33,7 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <boost/operators.hpp>
+#include <iosfwd>
 
 #include <osmium/osm/location.hpp>
 #include <osmium/osm/segment.hpp>
@@ -45,11 +45,11 @@ namespace osmium {
      * always equal or "smaller" than the second Location, ie to the left
      * and down.
      */
-    class UndirectedSegment : boost::less_than_comparable<UndirectedSegment>, public Segment {
+    class UndirectedSegment : public Segment {
 
     public:
 
-        UndirectedSegment(const osmium::Location& location1, const osmium::Location& location2) :
+        explicit UndirectedSegment(const osmium::Location& location1, const osmium::Location& location2) :
             Segment(location1, location2) {
             if (location2 < location1) {
                 swap_locations();
@@ -71,8 +71,28 @@ namespace osmium {
      * segment. The first() location is checked first() and only if they have the
      * same first() location the second() location is taken into account.
      */
-    inline bool operator<(const UndirectedSegment& lhs, const UndirectedSegment& rhs) {
+    inline bool operator<(const UndirectedSegment& lhs, const UndirectedSegment& rhs) noexcept {
         return (lhs.first() == rhs.first() && lhs.second() < rhs.second()) || lhs.first() < rhs.first();
+    }
+
+    inline bool operator>(const UndirectedSegment& lhs, const UndirectedSegment& rhs) noexcept {
+        return rhs < lhs;
+    }
+
+    inline bool operator<=(const UndirectedSegment& lhs, const UndirectedSegment& rhs) noexcept {
+        return ! (rhs < lhs);
+    }
+
+    inline bool operator>=(const UndirectedSegment& lhs, const UndirectedSegment& rhs) noexcept {
+        return ! (lhs < rhs);
+    }
+
+    /**
+     * Output UndirectedSegment to a stream.
+     */
+    template <typename TChar, typename TTraits>
+    inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const osmium::UndirectedSegment& segment) {
+        return out << segment.first() << "--" << segment.second();
     }
 
 } // namespace osmium

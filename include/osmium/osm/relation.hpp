@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -38,26 +38,22 @@ DEALINGS IN THE SOFTWARE.
 #include <cstdlib>
 #include <iterator>
 
-#include <osmium/memory/collection.hpp>
+#include <osmium/memory/collection.hpp> // IWYU pragma: keep
 #include <osmium/memory/item.hpp>
-#include <osmium/osm/entity.hpp>
 #include <osmium/osm/item_type.hpp>
 #include <osmium/osm/object.hpp>
 #include <osmium/osm/types.hpp>
 
 namespace osmium {
 
-    namespace memory {
-        template <class T> class ObjectBuilder;
-    }
-
-    namespace osm {
+    namespace builder {
+        template <class> class ObjectBuilder;
         class RelationMemberListBuilder;
     }
 
     class RelationMember : public osmium::memory::detail::ItemHelper {
 
-        friend class osmium::osm::RelationMemberListBuilder;
+        friend class osmium::builder::RelationMemberListBuilder;
 
         object_id_type   m_ref;
         item_type        m_type;
@@ -97,7 +93,7 @@ namespace osmium {
             }
         }
 
-        void set_role_size(string_size_type size) {
+        void set_role_size(string_size_type size) noexcept {
             m_role_size = size;
         }
 
@@ -105,65 +101,71 @@ namespace osmium {
 
         static constexpr item_type collection_type = item_type::relation_member_list;
 
-        RelationMember(const object_id_type ref=0, const item_type type=item_type(), const bool full=false) :
+        RelationMember(const object_id_type ref=0, const item_type type=item_type(), const bool full=false) noexcept :
             m_ref(ref),
             m_type(type),
             m_flags(full ? 1 : 0) {
         }
 
-        object_id_type ref() const {
+        object_id_type ref() const noexcept {
             return m_ref;
         }
 
-        unsigned_object_id_type positive_ref() const {
-            return std::abs(m_ref);
+        RelationMember& ref(object_id_type ref) noexcept {
+            m_ref = ref;
+            return *this;
         }
 
-        item_type type() const {
+        unsigned_object_id_type positive_ref() const noexcept {
+            return static_cast<unsigned_object_id_type>(std::abs(m_ref));
+        }
+
+        item_type type() const noexcept {
             return m_type;
         }
 
-        bool full_member() const {
+        bool full_member() const noexcept {
             return m_flags == 1;
         }
 
-        const char* role() const {
+        const char* role() const noexcept {
             return reinterpret_cast<const char*>(data() + sizeof(RelationMember));
         }
 
-        Object& get_object() {
-            return *reinterpret_cast<Object*>(endpos());
+        OSMObject& get_object() {
+            return *reinterpret_cast<OSMObject*>(endpos());
         }
 
-        const Object& get_object() const {
-            return *reinterpret_cast<const Object*>(endpos());
+        const OSMObject& get_object() const {
+            return *reinterpret_cast<const OSMObject*>(endpos());
         }
 
     }; // class RelationMember
 
-    class RelationMemberList : public osmium::memory::Collection<RelationMember> {
+    class RelationMemberList : public osmium::memory::Collection<RelationMember, osmium::item_type::relation_member_list> {
 
     public:
 
-        static constexpr osmium::item_type itemtype = osmium::item_type::relation_member_list;
+        typedef size_t size_type;
 
         RelationMemberList() :
-            osmium::memory::Collection<RelationMember>() {
+            osmium::memory::Collection<RelationMember, osmium::item_type::relation_member_list>() {
         }
 
-        size_t size() const noexcept {
-            return std::distance(begin(), end());
+        size_type size() const noexcept {
+            return static_cast<size_type>(std::distance(begin(), end()));
         }
 
     }; // class RelationMemberList
 
+    static_assert(sizeof(RelationMemberList) % osmium::memory::align_bytes == 0, "Class osmium::RelationMemberList has wrong size to be aligned properly!");
 
-    class Relation : public Object {
+    class Relation : public OSMObject {
 
-        friend class osmium::memory::ObjectBuilder<osmium::Relation>;
+        friend class osmium::builder::ObjectBuilder<osmium::Relation>;
 
-        Relation() :
-            Object(sizeof(Relation), osmium::item_type::relation) {
+        Relation() noexcept :
+            OSMObject(sizeof(Relation), osmium::item_type::relation) {
         }
 
     public:
@@ -171,11 +173,11 @@ namespace osmium {
         static constexpr osmium::item_type itemtype = osmium::item_type::relation;
 
         RelationMemberList& members() {
-            return subitem_of_type<RelationMemberList>();
+            return osmium::detail::subitem_of_type<RelationMemberList>(begin(), end());
         }
 
         const RelationMemberList& members() const {
-            return subitem_of_type<const RelationMemberList>();
+            return osmium::detail::subitem_of_type<const RelationMemberList>(cbegin(), cend());
         }
 
     }; // class Relation

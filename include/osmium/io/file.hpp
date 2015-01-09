@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,11 +35,9 @@ DEALINGS IN THE SOFTWARE.
 
 #include <cstddef>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <vector>
-
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 
 #include <osmium/io/file_format.hpp>
 #include <osmium/io/file_compression.hpp>
@@ -48,9 +46,23 @@ DEALINGS IN THE SOFTWARE.
 namespace osmium {
 
     /**
-     * @brief Namespace for everything related to input and output of OSM data.
+     * @brief Everything related to input and output of OSM data.
      */
     namespace io {
+
+        namespace detail {
+
+            inline std::vector<std::string> split(const std::string& in, const char delim) {
+                std::vector<std::string> result;
+                std::stringstream ss(in);
+                std::string item;
+                while (std::getline(ss, item, delim)) {
+                    result.push_back(item);
+                }
+                return result;
+            }
+
+        } // namespace detail
 
         /**
          * This class describes an OSM file in one of several different formats.
@@ -63,6 +75,9 @@ namespace osmium {
 
             std::string m_filename;
 
+            const char* m_buffer;
+            size_t m_buffer_size;
+
             std::string m_format_string;
 
             file_format m_file_format {file_format::unknown};
@@ -74,16 +89,20 @@ namespace osmium {
         public:
 
             /**
-             * Create File using type and encoding from filename. If you want
-             * to overwrite these settings you can change them later.
+             * Create File using type and encoding from filename or given
+             * format specification.
              *
              * @param filename Filename including suffix. The type and encoding
              *                 of the file will be taken from the suffix.
              *                 An empty filename or "-" means stdin or stdout.
+             * @param format File format as string. See the description of the
+             *               parse_format() function for details.
              */
-            File(const std::string& filename, const std::string& format = "") :
+            explicit File(const std::string& filename = "", const std::string& format = "") :
                 Options(),
                 m_filename(filename),
+                m_buffer(nullptr),
+                m_buffer_size(0),
                 m_format_string(format) {
 
                 // stdin/stdout
@@ -105,17 +124,47 @@ namespace osmium {
                 }
             }
 
-            File(const File& other) = default;
-            File& operator=(const File& other) = default;
+            /**
+             * Create File using buffer pointer and size and type and encoding
+             * from given format specification.
+             *
+             * @param buffer Pointer to buffer with data.
+             * @param size   Size of buffer.
+             * @param format File format as string. See the description of the
+             *               parse_format() function for details.
+             */
+            explicit File(const char* buffer, size_t size, const std::string& format = "") :
+                Options(),
+                m_filename(),
+                m_buffer(buffer),
+                m_buffer_size(size),
+                m_format_string(format) {
 
-            File(File&& other) = default;
-            File& operator=(File&& other) = default;
+                default_settings_for_stdinout();
+
+                if (format != "") {
+                    parse_format(format);
+                }
+            }
+
+            File(const File&) = default;
+            File& operator=(const File&) = default;
+
+            File(File&&) = default;
+            File& operator=(File&&) = default;
 
             ~File() = default;
 
+            const char* buffer() const noexcept {
+                return m_buffer;
+            }
+
+            size_t buffer_size() const noexcept {
+                return m_buffer_size;
+            }
+
             void parse_format(const std::string& format) {
-                std::vector<std::string> options;
-                boost::split(options, format, boost::is_any_of(","));
+                std::vector<std::string> options = detail::split(format, ',');
 
                 // if the first item in the format list doesn't contain
                 // an equals sign, it is a format
@@ -143,8 +192,7 @@ namespace osmium {
             }
 
             void detect_format_from_suffix(const std::string& name) {
-                std::vector<std::string> suffixes;
-                boost::split(suffixes, name, boost::is_any_of("."));
+                std::vector<std::string> suffixes = detail::split(name, '.');
 
                 if (suffixes.empty()) return;
 
@@ -246,29 +294,29 @@ namespace osmium {
                 m_file_compression = file_compression::none;
             }
 
-            file_format format() const {
+            file_format format() const noexcept {
                 return m_file_format;
             }
 
-            File& format(file_format format) {
+            File& set_format(file_format format) noexcept {
                 m_file_format = format;
                 return *this;
             }
 
-            file_compression compression() const {
+            file_compression compression() const noexcept {
                 return m_file_compression;
             }
 
-            File& compression(file_compression compression) {
+            File& set_compression(file_compression compression) noexcept {
                 m_file_compression = compression;
                 return *this;
             }
 
-            bool has_multiple_object_versions() const {
+            bool has_multiple_object_versions() const noexcept {
                 return m_has_multiple_object_versions;
             }
 
-            File& has_multiple_object_versions(bool value) {
+            File& set_has_multiple_object_versions(bool value) noexcept {
                 m_has_multiple_object_versions = value;
                 return *this;
             }
@@ -282,7 +330,7 @@ namespace osmium {
                 return *this;
             }
 
-            const std::string& filename() const {
+            const std::string& filename() const noexcept {
                 return m_filename;
             }
 

@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -38,13 +38,11 @@ DEALINGS IN THE SOFTWARE.
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <string>
 
 namespace osmium {
 
     /**
-     * Contains helpful utility classes and functions that are not
-     * strictly OSM related.
+     * @brief Helpful utility classes and functions not strictly OSM related
      */
     namespace util {
 
@@ -71,9 +69,13 @@ namespace osmium {
             /// a newline was written, start next output with runtime
             bool m_newline;
 
+            /**
+             * If we remember that a newline was written as the last thing
+             * write out the time elapsed and reset the newline flag.
+             */
             void start_line() {
                 if (m_newline) {
-                    int elapsed = runtime();
+                    time_t elapsed = runtime();
 
                     char old_fill = std::cerr.fill();
                     std::cerr << '[' << std::setw(2) << (elapsed / 60) << ':' << std::setw(2) << std::setfill('0') << (elapsed % 60) << "] ";
@@ -85,43 +87,43 @@ namespace osmium {
 
         public:
 
-            explicit VerboseOutput(bool verbose=false) :
+            explicit VerboseOutput(bool verbose=false) noexcept :
                 m_start(time(NULL)),
                 m_verbose(verbose),
                 m_newline(true) {
             }
 
-            ~VerboseOutput() {
-            }
+            ~VerboseOutput() = default;
 
             VerboseOutput(const VerboseOutput&) = default;
             VerboseOutput& operator=(const VerboseOutput&) = default;
             VerboseOutput(VerboseOutput&&) = default;
             VerboseOutput& operator=(VerboseOutput&&) = default;
 
-            int runtime() const {
+            time_t runtime() const noexcept {
                 return time(NULL) - m_start;
             }
 
             /// Get "verbose" setting.
-            bool verbose() const {
+            bool verbose() const noexcept {
                 return m_verbose;
             }
 
             /// Set "verbose" setting.
-            void verbose(bool verbose) {
+            void verbose(bool verbose) noexcept {
                 m_verbose = verbose;
             }
 
             template<typename T>
-            friend VerboseOutput& operator<<(VerboseOutput& verbose_output, T value) {
+            friend VerboseOutput& operator<<(VerboseOutput& verbose_output, const T& value) {
                 if (verbose_output.m_verbose) {
+                    verbose_output.start_line();
+                    std::cerr << value;
+
+                    // check if there was a newline a the end and remember that
                     std::ostringstream output_buffer;
                     output_buffer << value;
-                    verbose_output.start_line();
-                    std::cerr << output_buffer.str();
-
-                    if (!output_buffer.str().empty() && output_buffer.str()[output_buffer.str().size()-1] == '\n') {
+                    if (!output_buffer.str().empty() && output_buffer.str().back() == '\n') {
                         verbose_output.m_newline = true;
                     }
                 }

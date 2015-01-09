@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,20 +33,37 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <cstdint>
-
 #include <osmium/memory/item.hpp>
 
 namespace osmium {
 
-    // strings can be up to 2^16 characters long
-    typedef uint16_t string_size_type;
+    namespace detail {
 
+        template <class TSubitem, class TIter>
+        inline TSubitem& subitem_of_type(TIter it, TIter end) {
+            for (; it != end; ++it) {
+                if (it->type() == TSubitem::itemtype) {
+                    return reinterpret_cast<TSubitem&>(*it);
+                }
+            }
+
+            // If no subitem of the TSubitem type was found,
+            // return a default constructed one.
+            static TSubitem subitem;
+            return subitem;
+        }
+
+    } // namespace detail
+
+    /**
+     * \brief OSMEntity is the abstract base class for the OSMObject and
+     *        Changeset classes.
+     */
     class OSMEntity : public osmium::memory::Item {
 
     public:
 
-        OSMEntity(osmium::memory::item_size_type size, osmium::item_type type) :
+        explicit OSMEntity(osmium::memory::item_size_type size, osmium::item_type type) :
             Item(size, type) {
         }
 

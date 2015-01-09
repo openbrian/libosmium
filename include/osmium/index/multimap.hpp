@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -37,19 +37,24 @@ DEALINGS IN THE SOFTWARE.
 #include <type_traits>
 #include <utility>
 
+#include <osmium/index/index.hpp> // IWYU pragma: export
+
 namespace osmium {
 
     namespace index {
 
+        /**
+         * @brief Key-value containers with multiple values for an integer key
+         */
         namespace multimap {
 
-            template <typename TKey, typename TValue>
+            template <typename TId, typename TValue>
             class Multimap {
 
-                static_assert(std::is_integral<TKey>::value && std::is_unsigned<TKey>::value,
-                              "TKey template parameter for class Multimap must be unsigned integral type");
+                static_assert(std::is_integral<TId>::value && std::is_unsigned<TId>::value,
+                              "TId template parameter for class Multimap must be unsigned integral type");
 
-                typedef typename std::pair<TKey, TValue> element_type;
+                typedef typename std::pair<TId, TValue> element_type;
 
                 Multimap(const Multimap&) = delete;
                 Multimap& operator=(const Multimap&) = delete;
@@ -61,22 +66,22 @@ namespace osmium {
 
             public:
 
-                typedef TKey key_type;
-                typedef TValue mapped_type;
+                /// The "key" type, usually osmium::unsigned_object_id_type.
+                typedef TId key_type;
+
+                /// The "value" type, usually a Location or size_t.
+                typedef TValue value_type;
 
                 Multimap() = default;
 
                 virtual ~Multimap() noexcept = default;
 
-                /// The "value" type, usually a coordinates class or similar.
-                typedef TValue value_type;
-
                 /// Set the field with id to value.
-                virtual void set(const TKey id, const TValue value) = 0;
+                virtual void set(const TId id, const TValue value) = 0;
 
                 typedef element_type* iterator;
 
-//                virtual std::pair<iterator, iterator> get_all(const TKey key) const = 0;
+//                virtual std::pair<iterator, iterator> get_all(const TId id) const = 0;
 
                 /**
                  * Get the approximate number of items in the storage. The storage
@@ -107,6 +112,10 @@ namespace osmium {
                  */
                 virtual void sort() {
                     // default implementation is empty
+                }
+
+                virtual void dump_as_list(int /*fd*/) const {
+                    std::runtime_error("can't dump as list");
                 }
 
             }; // class Multimap

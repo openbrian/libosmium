@@ -1,6 +1,14 @@
+/*
+
+  Example program to look at Osmium indexes on disk.
+
+  The code in this example file is released into the Public Domain.
+
+*/
 
 #include <fcntl.h>
 #include <iomanip>
+#include <iostream>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -8,7 +16,6 @@
 
 #include <osmium/index/map/mmap_vector_file.hpp>
 #include <osmium/osm/location.hpp>
-#include <osmium/osm/ostream.hpp>
 #include <osmium/osm/types.hpp>
 
 template <typename TKey, typename TValue>

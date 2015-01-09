@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -52,23 +52,23 @@ namespace osmium {
              * This implementation uses std::multimap internally. It uses rather a
              * lot of memory, but might make sense for small maps.
              */
-            template <typename TKey, typename TValue>
-            class StlMultimap : public osmium::index::multimap::Multimap<TKey, TValue> {
+            template <typename TId, typename TValue>
+            class StlMultimap : public osmium::index::multimap::Multimap<TId, TValue> {
 
                 // This is a rough estimate for the memory needed for each
-                // element in the map (key + value + pointers to left, right,
+                // element in the map (id + value + pointers to left, right,
                 // and parent plus some overhead for color of red-black-tree
                 // or similar).
-                static constexpr size_t element_size = sizeof(TKey) + sizeof(TValue) + sizeof(void*) * 4;
+                static constexpr size_t element_size = sizeof(TId) + sizeof(TValue) + sizeof(void*) * 4;
 
             public:
 
-                typedef typename std::multimap<const TKey, TValue> collection_type;
+                typedef typename std::multimap<const TId, TValue> collection_type;
                 typedef typename collection_type::iterator iterator;
                 typedef typename collection_type::const_iterator const_iterator;
                 typedef typename collection_type::value_type value_type;
 
-                typedef typename std::pair<TKey, TValue> element_type;
+                typedef typename std::pair<TId, TValue> element_type;
 
             private:
 
@@ -80,24 +80,24 @@ namespace osmium {
 
                 ~StlMultimap() noexcept override final = default;
 
-                void unsorted_set(const TKey key, const TValue value) {
-                    m_elements.insert(std::make_pair(key, value));
+                void unsorted_set(const TId id, const TValue value) {
+                    m_elements.emplace(id, value);
                 }
 
-                void set(const TKey key, const TValue value) override final {
-                    m_elements.insert(std::make_pair(key, value));
+                void set(const TId id, const TValue value) override final {
+                    m_elements.emplace(id, value);
                 }
 
-                std::pair<iterator, iterator> get_all(const TKey key) {
-                    return m_elements.equal_range(key);
+                std::pair<iterator, iterator> get_all(const TId id) {
+                    return m_elements.equal_range(id);
                 }
 
-                std::pair<const_iterator, const_iterator> get_all(const TKey key) const {
-                    return m_elements.equal_range(key);
+                std::pair<const_iterator, const_iterator> get_all(const TId id) const {
+                    return m_elements.equal_range(id);
                 }
 
-                void remove(const TKey key, const TValue value) {
-                    std::pair<iterator, iterator> r = get_all(key);
+                void remove(const TId id, const TValue value) {
+                    std::pair<iterator, iterator> r = get_all(id);
                     for (iterator it = r.first; it != r.second; ++it) {
                         if (it->second == value) {
                             m_elements.erase(it);
@@ -130,10 +130,10 @@ namespace osmium {
                     // intentionally left blank
                 }
 
-                void dump_as_list(const int fd) const {
+                void dump_as_list(const int fd) const override final {
                     std::vector<element_type> v;
                     for (const auto& element : m_elements) {
-                        v.push_back(element_type(element.first, element.second));
+                        v.emplace_back(element.first, element.second);
                     }
 //                    std::copy(m_elements.cbegin(), m_elements.cend(), std::back_inserter(v));
                     std::sort(v.begin(), v.end());

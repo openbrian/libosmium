@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,11 +33,16 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#include <iosfwd>
+
+#include <osmium/util/compatibility.hpp>
 #include <osmium/osm/location.hpp>
 
 namespace osmium {
 
-    /// Bounding box.
+    /**
+     * Bounding box.
+     */
     class Box {
 
         osmium::Location m_bottom_left;
@@ -49,9 +54,19 @@ namespace osmium {
          * Create undefined Box. Use the extend() function
          * to add actual bounds.
          */
-        constexpr Box() :
+        constexpr Box() noexcept :
             m_bottom_left(),
             m_top_right() {
+        }
+
+        Box(double minx, double miny, double maxx, double maxy) :
+            m_bottom_left(minx, miny),
+            m_top_right(maxx, maxy) {
+        }
+
+        Box(const osmium::Location& bottom_left, const osmium::Location& top_right) :
+            m_bottom_left(bottom_left),
+            m_top_right(top_right) {
         }
 
         Box(const Box&) = default;
@@ -61,29 +76,39 @@ namespace osmium {
         ~Box() = default;
 
         /**
-         * Extend the bounding box by the given location. If the
+         * Extend this bounding box by the given location. If the
          * location is undefined, the bounding box is unchanged.
          */
         Box& extend(const Location& location) noexcept {
             if (location) {
                 if (m_bottom_left) {
                     if (location.x() < m_bottom_left.x()) {
-                        m_bottom_left.x(location.x());
+                        m_bottom_left.set_x(location.x());
                     }
                     if (location.x() > m_top_right.x()) {
-                        m_top_right.x(location.x());
+                        m_top_right.set_x(location.x());
                     }
                     if (location.y() < m_bottom_left.y()) {
-                        m_bottom_left.y(location.y());
+                        m_bottom_left.set_y(location.y());
                     }
                     if (location.y() > m_top_right.y()) {
-                        m_top_right.y(location.y());
+                        m_top_right.set_y(location.y());
                     }
                 } else {
                     m_bottom_left = location;
                     m_top_right = location;
                 }
             }
+            return *this;
+        }
+
+        /**
+         * Extend this bounding box by the given box. If the
+         * box is undefined, the bounding box is unchanged.
+         */
+        Box& extend(const Box& box) noexcept {
+            extend(box.bottom_left());
+            extend(box.top_right());
             return *this;
         }
 
@@ -105,15 +130,47 @@ namespace osmium {
         /**
          * Bottom-left location.
          */
-        constexpr Location bottom_left() const noexcept {
+        OSMIUM_CONSTEXPR Location bottom_left() const noexcept {
+            return m_bottom_left;
+        }
+
+        /**
+         * Bottom-left location.
+         */
+        Location& bottom_left() noexcept {
             return m_bottom_left;
         }
 
         /**
          * Top-right location.
          */
-        constexpr Location top_right() const noexcept {
+        OSMIUM_CONSTEXPR Location top_right() const noexcept {
             return m_top_right;
+        }
+
+        /**
+         * Top-right location.
+         */
+        Location& top_right() noexcept {
+            return m_top_right;
+        }
+
+        /**
+         * Is the location inside the box?
+         */
+        bool contains(const osmium::Location& location) const {
+            return location.x() >= bottom_left().x() && location.y() >= bottom_left().y() &&
+                   location.x() <= top_right().x() && location.y() <= top_right().y();
+        }
+
+        /**
+         * Calculate size of the box in square degrees.
+         *
+         * @throws osmium::invalid_location unless all coordinates are valid
+         */
+        double size() const {
+            return (m_top_right.lon() - m_bottom_left.lon()) *
+                   (m_top_right.lat() - m_bottom_left.lat());
         }
 
     }; // class Box
@@ -121,10 +178,30 @@ namespace osmium {
     /**
      * Boxes are equal if both locations are equal.
      */
-    inline constexpr bool operator==(const Box& lhs, const Box& rhs) noexcept {
+    inline OSMIUM_CONSTEXPR bool operator==(const Box& lhs, const Box& rhs) noexcept {
         return lhs.bottom_left() == rhs.bottom_left() && lhs.top_right() == rhs.top_right();
     }
 
+    /**
+     * Output a box to a stream.
+     */
+    template <typename TChar, typename TTraits>
+    inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const osmium::Box& box) {
+        if (box) {
+            out << '('
+                << box.bottom_left().lon()
+                << ','
+                << box.bottom_left().lat()
+                << ','
+                << box.top_right().lon()
+                << ','
+                << box.top_right().lat()
+                << ')';
+        } else {
+            out << "(undefined)";
+        }
+        return out;
+    }
 } // namespace osmium
 
 #endif // OSMIUM_OSM_BOX_HPP

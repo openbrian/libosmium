@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,152 +33,77 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <cassert>
-#include <cstddef>
-#include <cstdlib>
-
-#include <osmium/memory/collection.hpp>
 #include <osmium/memory/item.hpp>
 #include <osmium/osm/item_type.hpp>
-#include <osmium/osm/location.hpp>
 #include <osmium/osm/object.hpp>
 #include <osmium/osm/types.hpp>
+#include <osmium/osm/node_ref.hpp>
+#include <osmium/osm/node_ref_list.hpp>
 
 namespace osmium {
 
-    namespace memory {
+    namespace builder {
         template <class T> class ObjectBuilder;
     }
 
-    class WayNode : public osmium::memory::detail::ItemHelper {
-
-        object_id_type m_ref;
-        Location m_location;
-
-        template <class TMember>
-        friend class osmium::memory::CollectionIterator;
-
-        unsigned char* next() {
-            return data() + sizeof(WayNode);
-        }
-
-        const unsigned char* next() const {
-            return data() + sizeof(WayNode);
-        }
+    /**
+     * List of node references (id and location) in a way.
+     */
+    class WayNodeList : public NodeRefList<osmium::item_type::way_node_list> {
 
     public:
-
-        static constexpr osmium::item_type collection_type = osmium::item_type::way_node_list;
-
-        WayNode(const object_id_type ref=0, const Location& location=Location()) :
-            m_ref(ref),
-            m_location(location) {
-        }
-
-        object_id_type ref() const {
-            return m_ref;
-        }
-
-        unsigned_object_id_type positive_ref() const {
-            return std::abs(m_ref);
-        }
-
-        Location location() const {
-            return m_location;
-        }
-
-        void location(const Location& location) {
-            m_location = location;
-        }
-
-    }; // class WayNode
-
-    inline bool operator<(const WayNode& lhs, const WayNode& rhs) {
-        return lhs.ref() < rhs.ref();
-    }
-
-    inline bool operator>(const WayNode& lhs, const WayNode& rhs) {
-        return lhs.ref() > rhs.ref();
-    }
-
-    inline bool operator<=(const WayNode& lhs, const WayNode& rhs) {
-        return lhs.ref() <= rhs.ref();
-    }
-
-    inline bool operator>=(const WayNode& lhs, const WayNode& rhs) {
-        return lhs.ref() >= rhs.ref();
-    }
-
-    inline bool operator==(const WayNode& lhs, const WayNode& rhs) {
-        return lhs.ref() == rhs.ref();
-    }
-
-    inline bool operator!=(const WayNode& lhs, const WayNode& rhs) {
-        return !(lhs == rhs);
-    }
-
-
-    class WayNodeList : public osmium::memory::Collection<WayNode> {
-
-    public:
-
-        static constexpr osmium::item_type itemtype = osmium::item_type::way_node_list;
 
         WayNodeList():
-            osmium::memory::Collection<WayNode>() {
-        }
-
-        size_t size() const noexcept {
-            assert((byte_size() - sizeof(WayNodeList)) % sizeof(WayNode) == 0);
-            return (byte_size() - sizeof(WayNodeList)) / sizeof(WayNode);
-        }
-
-        const WayNode& operator[](size_t n) const {
-            const WayNode* wn = &*begin();
-            return wn[n];
-        }
-
-        bool is_closed() const {
-            return operator[](0).ref() == operator[](size()-1).ref();
+            NodeRefList<osmium::item_type::way_node_list>() {
         }
 
     }; // class WayNodeList
 
+    static_assert(sizeof(WayNodeList) % osmium::memory::align_bytes == 0, "Class osmium::WayNodeList has wrong size to be aligned properly!");
 
-    class Way : public Object {
+    class Way : public OSMObject {
 
-        friend class osmium::memory::ObjectBuilder<osmium::Way>;
+        friend class osmium::builder::ObjectBuilder<osmium::Way>;
 
-        Way() :
-            Object(sizeof(Way), osmium::item_type::way) {
+        Way() noexcept :
+            OSMObject(sizeof(Way), osmium::item_type::way) {
         }
 
     public:
 
-        static constexpr osmium::item_type itemtype = osmium::item_type::way;
-
         WayNodeList& nodes() {
-            return subitem_of_type<WayNodeList>();
+            return osmium::detail::subitem_of_type<WayNodeList>(begin(), end());
         }
 
         const WayNodeList& nodes() const {
-            return subitem_of_type<const WayNodeList>();
+            return osmium::detail::subitem_of_type<const WayNodeList>(cbegin(), cend());
         }
 
         /**
-         * Update all nodes in a way with the ID of the given WayNode with the
-         * location of the given WayNode.
+         * Update all nodes in a way with the ID of the given NodeRef with the
+         * location of the given NodeRef.
          */
-        void update_node_location(const WayNode& new_wn) {
-            for (auto& wn : nodes()) {
-                if (wn.ref() == new_wn.ref()) {
-                    wn.location(new_wn.location());
+        void update_node_location(const NodeRef& new_node_ref) {
+            for (auto& node_ref : nodes()) {
+                if (node_ref.ref() == new_node_ref.ref()) {
+                    node_ref.set_location(new_node_ref.location());
                 }
             }
         }
 
+        /**
+         * Do the nodes in this way form a closed ring?
+         */
         bool is_closed() const {
             return nodes().is_closed();
+        }
+
+        bool ends_have_same_id() const {
+            return nodes().ends_have_same_id();
+        }
+
+        bool ends_have_same_location() const {
+            return nodes().ends_have_same_location();
         }
 
     }; // class Way

@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,23 +33,25 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#define OSMIUM_LINK_WITH_LIBS_PBF -pthread -lz -lprotobuf-lite -losmpbf
-
 #include <stdexcept>
 
 #include <osmpbf/osmpbf.h>
 
 // needed for htonl and ntohl
-#ifndef WIN32
+#ifndef _WIN32
 # include <netinet/in.h>
 #else
 # include <winsock2.h>
 #endif
 
+#include <osmium/io/error.hpp>
 #include <osmium/osm/item_type.hpp>
 
 namespace osmium {
 
+// avoid g++ false positive
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
     inline item_type osmpbf_membertype_to_item_type(const OSMPBF::Relation::MemberType mt) {
         switch (mt) {
             case OSMPBF::Relation::NODE:
@@ -58,10 +60,9 @@ namespace osmium {
                 return item_type::way;
             case OSMPBF::Relation::RELATION:
                 return item_type::relation;
-            default:
-                throw std::runtime_error("Unknown relation member type");
         }
     }
+#pragma GCC diagnostic pop
 
     inline OSMPBF::Relation::MemberType item_type_to_osmpbf_membertype(const item_type type) {
         switch (type) {
@@ -75,6 +76,22 @@ namespace osmium {
                 throw std::runtime_error("Unknown relation member type");
         }
     }
+
+    /**
+     * Exception thrown when there was a problem with parsing the PBF format of
+     * a file.
+     */
+    struct pbf_error : public io_error {
+
+        pbf_error(const std::string& what) :
+            io_error(std::string("PBF error: ") + what) {
+        }
+
+        pbf_error(const char* what) :
+            io_error(std::string("PBF error: ") + what) {
+        }
+
+    }; // struct pbf_error
 
 } // namespace osmium
 

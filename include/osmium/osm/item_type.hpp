@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,11 +33,13 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <cstdint>
+#include <cstdint> // IWYU pragma: keep
+#include <iosfwd>
+#include <stdexcept>
 
 namespace osmium {
 
-    enum class item_type : uint32_t {
+    enum class item_type : uint16_t {
 
         undefined                              = 0x00,
         node                                   = 0x01,
@@ -48,54 +50,123 @@ namespace osmium {
         tag_list                               = 0x11,
         way_node_list                          = 0x12,
         relation_member_list                   = 0x13,
-        relation_member_list_with_full_members = 0x23
+        relation_member_list_with_full_members = 0x23,
+        outer_ring                             = 0x40,
+        inner_ring                             = 0x41
 
     }; // enum class item_type
 
-    inline item_type char_to_item_type(const char c) {
+    inline item_type char_to_item_type(const char c) noexcept {
         switch (c) {
+            case 'X':
+                return item_type::undefined;
             case 'n':
                 return item_type::node;
             case 'w':
                 return item_type::way;
             case 'r':
                 return item_type::relation;
+            case 'a':
+                return item_type::area;
             case 'c':
                 return item_type::changeset;
+            case 'T':
+                return item_type::tag_list;
+            case 'N':
+                return item_type::way_node_list;
+            case 'M':
+                return item_type::relation_member_list;
+            case 'F':
+                return item_type::relation_member_list_with_full_members;
+            case 'O':
+                return item_type::outer_ring;
+            case 'I':
+                return item_type::inner_ring;
             default:
                 return item_type::undefined;
         }
     }
 
-    inline char item_type_to_char(const item_type type) {
+// avoid g++ false positive
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
+    inline char item_type_to_char(const item_type type) noexcept {
         switch (type) {
+            case item_type::undefined:
+                return 'X';
             case item_type::node:
                 return 'n';
             case item_type::way:
                 return 'w';
             case item_type::relation:
                 return 'r';
+            case item_type::area:
+                return 'a';
             case item_type::changeset:
                 return 'c';
-            default:
-                return '-';
+            case item_type::tag_list:
+                return 'T';
+            case item_type::way_node_list:
+                return 'N';
+            case item_type::relation_member_list:
+                return 'M';
+            case item_type::relation_member_list_with_full_members:
+                return 'F';
+            case item_type::outer_ring:
+                return 'O';
+            case item_type::inner_ring:
+                return 'I';
         }
     }
 
-    inline const char* item_type_to_name(const item_type type) {
+    inline const char* item_type_to_name(const item_type type) noexcept {
         switch (type) {
+            case item_type::undefined:
+                return "undefined";
             case item_type::node:
                 return "node";
             case item_type::way:
                 return "way";
             case item_type::relation:
                 return "relation";
+            case item_type::area:
+                return "area";
             case item_type::changeset:
                 return "changeset";
-            default:
-                return "-";
+            case item_type::tag_list:
+                return "tag_list";
+            case item_type::way_node_list:
+                return "way_node_list";
+            case item_type::relation_member_list:
+                return "relation_member_list";
+            case item_type::relation_member_list_with_full_members:
+                return "relation_member_list_with_full_members";
+            case item_type::outer_ring:
+                return "outer_ring";
+            case item_type::inner_ring:
+                return "inner_ring";
         }
     }
+#pragma GCC diagnostic pop
+
+    template <typename TChar, typename TTraits>
+    inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const item_type item_type) {
+        return out << item_type_to_char(item_type);
+    }
+
+    /**
+     * This exception is thrown when a visitor encounters an unknown item type.
+     * Under usual circumstance this should not happen. If it does happen, it
+     * probably means the buffer contains different kinds of objects than were
+     * expected or that there is some kind of data corruption.
+     */
+    struct unknown_type : public std::runtime_error {
+
+        unknown_type() :
+            std::runtime_error("unknown item type") {
+        }
+
+    }; // struct unknown_type
 
 } // namespace osmium
 

@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,25 +33,25 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
+#include <iosfwd>
 #include <utility>
 
-#include <boost/operators.hpp>
-
 #include <osmium/osm/location.hpp>
+#include <osmium/util/compatibility.hpp>
 
 namespace osmium {
 
     /**
      * A Segment is the directed connection between two Locations.
      */
-    class Segment : boost::equality_comparable<Segment> {
+    class Segment {
 
         osmium::Location m_first;
         osmium::Location m_second;
 
     public:
 
-        constexpr Segment(const osmium::Location& location1, const osmium::Location& location2) :
+        explicit constexpr Segment(const osmium::Location& location1, const osmium::Location& location2) noexcept :
             m_first(location1),
             m_second(location2) {
         }
@@ -65,12 +65,12 @@ namespace osmium {
         ~Segment() = default;
 
         /// Return first Location of Segment.
-        constexpr osmium::Location first() const {
+        OSMIUM_CONSTEXPR osmium::Location first() const noexcept {
             return m_first;
         }
 
         /// Return second Location of Segment.
-        constexpr osmium::Location second() const {
+        OSMIUM_CONSTEXPR osmium::Location second() const noexcept {
             return m_second;
         }
 
@@ -84,8 +84,20 @@ namespace osmium {
     }; // class Segment
 
     /// Segments are equal if both their locations are equal
-    inline constexpr bool operator==(const Segment& lhs, const Segment& rhs) {
+    inline OSMIUM_CONSTEXPR bool operator==(const Segment& lhs, const Segment& rhs) noexcept {
         return lhs.first() == rhs.first() && lhs.second() == rhs.second();
+    }
+
+    inline OSMIUM_CONSTEXPR bool operator!=(const Segment& lhs, const Segment& rhs) noexcept {
+        return ! (lhs == rhs);
+    }
+
+    /**
+     * Output Segment to a stream.
+     */
+    template <typename TChar, typename TTraits>
+    inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const osmium::Segment& segment) {
+        return out << segment.first() << "->" << segment.second();
     }
 
 } // namespace osmium

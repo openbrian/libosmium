@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -33,7 +33,7 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <iostream>
+#include <iosfwd>
 
 namespace osmium {
 
@@ -47,6 +47,9 @@ namespace osmium {
             json    = 4
         };
 
+// avoid g++ false positive
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
         inline const char* as_string(file_format format) {
             switch (format) {
                 case file_format::unknown:
@@ -60,12 +63,12 @@ namespace osmium {
                 case file_format::json:
                     return "JSON";
             }
-            return "";
         }
+#pragma GCC diagnostic pop
 
-        inline std::ostream& operator<<(std::ostream& out, const file_format format) {
-            out << as_string(format);
-            return out;
+        template <typename TChar, typename TTraits>
+        inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, const file_format format) {
+            return out << as_string(format);
         }
 
     } // namespace io

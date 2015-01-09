@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,11 +35,20 @@ DEALINGS IN THE SOFTWARE.
 
 #include <cstdint>
 #include <ctime>
+#include <iosfwd>
+#include <limits>
 #include <stdexcept>
 #include <string>
+#include <time.h>
+
+#include <osmium/util/compatibility.hpp>
 
 namespace osmium {
 
+    /**
+     * A timestamp. Internal representation is an unsigned 32bit integer
+     * holding seconds since epoch, so this will overflow in 2038.
+     */
     class Timestamp {
 
         // length of ISO timestamp string yyyy-mm-ddThh:mm:ssZ\0
@@ -58,12 +67,14 @@ namespace osmium {
 
     public:
 
-        constexpr Timestamp() :
+        constexpr Timestamp() noexcept :
             m_timestamp(0) {
         }
 
-        constexpr Timestamp(time_t timestamp) :
-            m_timestamp(timestamp) {
+        // Not "explicit" so that conversions from time_t work
+        // like in node.timestamp(123);
+        constexpr Timestamp(time_t timestamp) noexcept :
+            m_timestamp(static_cast<uint32_t>(timestamp)) {
         }
 
         /**
@@ -71,12 +82,14 @@ namespace osmium {
          * Throws std::invalid_argument, if the timestamp can not be parsed.
          */
         explicit Timestamp(const char* timestamp) {
-#ifndef WIN32
-            struct tm tm { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#ifndef _WIN32
+            struct tm tm {
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            };
             if (strptime(timestamp, timestamp_format(), &tm) == nullptr) {
                 throw std::invalid_argument("can't parse timestamp");
             }
-            m_timestamp = timegm(&tm);
+            m_timestamp = static_cast<uint32_t>(timegm(&tm));
 #else
             struct tm tm;
             int n = sscanf(timestamp, "%4d-%2d-%2dT%2d:%2d:%2dZ", &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
@@ -92,35 +105,66 @@ namespace osmium {
 #endif
         }
 
-        constexpr time_t seconds_since_epoch() const {
+        constexpr time_t seconds_since_epoch() const noexcept {
             return static_cast<time_t>(m_timestamp);
         }
 
-        constexpr operator time_t() const {
+        constexpr operator time_t() const noexcept {
             return static_cast<time_t>(m_timestamp);
+        }
+
+        template <typename T>
+        void operator+=(T time_difference) noexcept {
+            m_timestamp += time_difference;
+        }
+
+        template <typename T>
+        void operator-=(T time_difference) noexcept {
+            m_timestamp -= time_difference;
         }
 
         /**
          * Return UTC Unix time as string in ISO date/time format.
          */
         std::string to_iso() const {
-            if (m_timestamp == 0) {
-                return std::string("");
+            std::string s;
+
+            if (m_timestamp != 0) {
+                struct tm tm;
+                time_t sse = seconds_since_epoch();
+#ifndef _MSC_VER
+                gmtime_r(&sse, &tm);
+#else
+                gmtime_s(&tm, &sse);
+#endif
+
+                s.resize(timestamp_length);
+                /* This const_cast is ok, because we know we have enough space
+                in the string for the format we are using (well at least until
+                the year will have 5 digits). And by setting the size
+                afterwards from the result of strftime we make sure thats set
+                right, too. */
+                s.resize(strftime(const_cast<char*>(s.c_str()), timestamp_length, timestamp_format(), &tm));
             }
-            struct tm tm { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-            time_t sse = seconds_since_epoch();
-            gmtime_r(&sse, &tm);
-            std::string s(timestamp_length, '\0');
-            /* This const_cast is ok, because we know we have enough space
-               in the string for the format we are using (well at least until
-               the year will have 5 digits). And by setting the size
-               afterwards from the result of strftime we make sure thats set
-               right, too. */
-            s.resize(strftime(const_cast<char*>(s.c_str()), timestamp_length, timestamp_format(), &tm));
+
             return s;
         }
 
     }; // class Timestamp
+
+    inline OSMIUM_CONSTEXPR Timestamp start_of_time() noexcept {
+        return Timestamp(1);
+    }
+
+    inline OSMIUM_CONSTEXPR Timestamp end_of_time() noexcept {
+        return Timestamp(std::numeric_limits<time_t>::max());
+    }
+
+    template <typename TChar, typename TTraits>
+    inline std::basic_ostream<TChar, TTraits>& operator<<(std::basic_ostream<TChar, TTraits>& out, Timestamp timestamp) {
+        out << timestamp.to_iso();
+        return out;
+    }
 
 } // namespace osmium
 

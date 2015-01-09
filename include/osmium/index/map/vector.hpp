@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -47,18 +47,23 @@ namespace osmium {
 
         namespace map {
 
-            template <class TVector, typename TKey, typename TValue>
-            class VectorBasedDenseMap : public Map<TKey, TValue> {
+            template <class TVector, typename TId, typename TValue>
+            class VectorBasedDenseMap : public Map<TId, TValue> {
 
                 TVector m_vector;
 
             public:
 
+                typedef TValue element_type;
+                typedef TVector vector_type;
+                typedef typename vector_type::iterator iterator;
+                typedef typename vector_type::const_iterator const_iterator;
+
                 VectorBasedDenseMap() :
                     m_vector() {
                 }
 
-                VectorBasedDenseMap(int fd) :
+                explicit VectorBasedDenseMap(int fd) :
                     m_vector(fd) {
                 }
 
@@ -68,19 +73,23 @@ namespace osmium {
                     m_vector.reserve(size);
                 }
 
-                void set(const TKey key, const TValue value) override final {
-                    if (size() <= key) {
-                        m_vector.resize(key+1);
+                void set(const TId id, const TValue value) override final {
+                    if (size() <= id) {
+                        m_vector.resize(id+1);
                     }
-                    m_vector[key] = value;
+                    m_vector[id] = value;
                 }
 
-                const TValue get(const TKey key) const override final {
-                    const TValue& value = m_vector.at(key);
-                    if (value == TValue {}) {
-                        throw std::out_of_range("out of range");
+                const TValue get(const TId id) const override final {
+                    try {
+                        const TValue& value = m_vector.at(id);
+                        if (value == osmium::index::empty_value<TValue>()) {
+                            not_found_error(id);
+                        }
+                        return value;
+                    } catch (std::out_of_range&) {
+                        not_found_error(id);
                     }
-                    return value;
                 }
 
                 size_t size() const override final {
@@ -96,15 +105,39 @@ namespace osmium {
                     m_vector.shrink_to_fit();
                 }
 
+                iterator begin() {
+                    return m_vector.begin();
+                }
+
+                iterator end() {
+                    return m_vector.end();
+                }
+
+                const_iterator cbegin() const {
+                    return m_vector.cbegin();
+                }
+
+                const_iterator cend() const {
+                    return m_vector.cend();
+                }
+
+                const_iterator begin() const {
+                    return m_vector.cbegin();
+                }
+
+                const_iterator end() const {
+                    return m_vector.cend();
+                }
+
             }; // class VectorBasedDenseMap
 
 
-            template <typename TKey, typename TValue, template<typename...> class TVector>
-            class VectorBasedSparseMap : public Map<TKey, TValue> {
+            template <typename TId, typename TValue, template<typename...> class TVector>
+            class VectorBasedSparseMap : public Map<TId, TValue> {
 
             public:
 
-                typedef typename std::pair<TKey, TValue> element_type;
+                typedef typename std::pair<TId, TValue> element_type;
                 typedef TVector<element_type> vector_type;
                 typedef typename vector_type::iterator iterator;
                 typedef typename vector_type::const_iterator const_iterator;
@@ -125,17 +158,20 @@ namespace osmium {
 
                 ~VectorBasedSparseMap() override final = default;
 
-                void set(const TKey key, const TValue value) override final {
-                    m_vector.push_back(element_type(key, value));
+                void set(const TId id, const TValue value) override final {
+                    m_vector.push_back(element_type(id, value));
                 }
 
-                const TValue get(const TKey key) const override final {
-                    const element_type element {key, TValue {}};
+                const TValue get(const TId id) const override final {
+                    const element_type element {
+                        id,
+                        osmium::index::empty_value<TValue>()
+                    };
                     const auto result = std::lower_bound(m_vector.begin(), m_vector.end(), element, [](const element_type& a, const element_type& b) {
                         return a.first < b.first;
                     });
-                    if (result == m_vector.end() || result->first != key) {
-                        throw std::out_of_range("Unknown ID");
+                    if (result == m_vector.end() || result->first != id) {
+                        not_found_error(id);
                     } else {
                         return result->second;
                     }
@@ -162,7 +198,7 @@ namespace osmium {
                     std::sort(m_vector.begin(), m_vector.end());
                 }
 
-                void dump_as_list(int fd) const {
+                void dump_as_list(int fd) const override final {
                     osmium::io::detail::reliable_write(fd, reinterpret_cast<const char*>(m_vector.data()), byte_size());
                 }
 

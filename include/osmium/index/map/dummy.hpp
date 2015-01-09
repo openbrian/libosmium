@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -34,7 +34,6 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include <cstddef>
-#include <stdexcept>
 
 #include <osmium/index/map.hpp>
 
@@ -49,8 +48,8 @@ namespace osmium {
              * Use this class if you don't need a map, but you
              * need an object that behaves like one.
              */
-            template <typename TKey, typename TValue>
-            class Dummy : public osmium::index::map::Map<TKey, TValue> {
+            template <typename TId, typename TValue>
+            class Dummy : public osmium::index::map::Map<TId, TValue> {
 
             public:
 
@@ -58,12 +57,12 @@ namespace osmium {
 
                 ~Dummy() override final = default;
 
-                void set(const TKey, const TValue) override final {
+                void set(const TId, const TValue) override final {
                     // intentionally left blank
                 }
 
-                const TValue get(const TKey) const override final {
-                    throw std::out_of_range("ID doesn't exist");
+                const TValue get(const TId id) const override final {
+                    not_found_error(id);
                 }
 
                 size_t size() const override final {

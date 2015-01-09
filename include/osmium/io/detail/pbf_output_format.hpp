@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -128,6 +128,7 @@ More complete outlines of real .osm.pbf files can be created using the osmpbf-ou
 #include <osmium/osm/tag.hpp>
 #include <osmium/osm/timestamp.hpp>
 #include <osmium/osm/way.hpp>
+#include <osmium/util/cast.hpp>
 #include <osmium/visitor.hpp>
 
 namespace osmium {
@@ -153,7 +154,7 @@ namespace osmium {
                         std::string content;
                         msg.SerializeToString(&content);
 
-                        pbf_blob.set_raw_size(content.size());
+                        pbf_blob.set_raw_size(static_cast_with_assert<::google::protobuf::int32>(content.size()));
 
                         if (use_compression) {
                             pbf_blob.set_zlib_data(osmium::io::detail::zlib_compress(content));
@@ -167,12 +168,12 @@ namespace osmium {
 
                     OSMPBF::BlobHeader pbf_blob_header;
                     pbf_blob_header.set_type(type);
-                    pbf_blob_header.set_datasize(blob_data.size());
+                    pbf_blob_header.set_datasize(static_cast_with_assert<::google::protobuf::int32>(blob_data.size()));
 
                     std::string blob_header_data;
                     pbf_blob_header.SerializeToString(&blob_header_data);
 
-                    uint32_t sz = htonl(blob_header_data.size());
+                    uint32_t sz = htonl(static_cast_with_assert<uint32_t>(blob_header_data.size()));
 
                     // write to output: the 4-byte BlobHeader-Size followed by the BlobHeader followed by the Blob
                     std::string output;
@@ -228,7 +229,7 @@ namespace osmium {
                  * as well as Osmium implementation always
                  * uses at most 8k entities in a block.
                  */
-                static const uint32_t max_block_contents = 8000;
+                static constexpr uint32_t max_block_contents = 8000;
 
                 /**
                  * The output buffer (block) will be filled to about
@@ -236,7 +237,7 @@ namespace osmium {
                  * enough space for the string table (which typically
                  * needs about 0.1 to 0.3% of the block size).
                  */
-                static const int buffer_fill_percent = 95;
+                static constexpr int64_t buffer_fill_percent = 95;
 
                 /**
                  * protobuf-struct of a HeaderBlock
@@ -313,7 +314,7 @@ namespace osmium {
                  * called once for each object.
                  */
                 uint16_t primitive_block_contents;
-                uint32_t primitive_block_size;
+                int primitive_block_size;
 
                 // StringTable management
                 StringTable string_table;
@@ -329,7 +330,7 @@ namespace osmium {
                 Delta<int64_t> m_delta_timestamp;
                 Delta<int64_t> m_delta_changeset;
                 Delta<int64_t> m_delta_uid;
-                Delta<uint32_t> m_delta_user_sid;
+                Delta<::google::protobuf::int32> m_delta_user_sid;
 
                 bool debug;
 
@@ -350,7 +351,7 @@ namespace osmium {
                     // test, if the node-block has been allocated
                     if (pbf_nodes) {
                         // iterate over all nodes, passing them to the map_common_string_ids function
-                        for (int i=0, l=pbf_nodes->nodes_size(); i<l; i++) {
+                        for (int i=0, l=pbf_nodes->nodes_size(); i<l; ++i) {
                             map_common_string_ids(pbf_nodes->mutable_nodes(i));
                         }
 
@@ -362,9 +363,9 @@ namespace osmium {
                             // in the densenodes structure keys and vals are encoded in an intermixed
                             // array, individual nodes are seperated by a value of 0 (0 in the StringTable
                             // is always unused). String-ids of 0 are thus kept alone.
-                            for (int i=0, l=dense->keys_vals_size(); i<l; i++) {
+                            for (int i=0, l=dense->keys_vals_size(); i<l; ++i) {
                                 // map interim string-ids > 0 to real string ids
-                                uint16_t sid = dense->keys_vals(i);
+                                auto sid = dense->keys_vals(i);
                                 if (sid > 0) {
                                     dense->set_keys_vals(i, string_table.map_string_id(sid));
                                 }
@@ -376,9 +377,9 @@ namespace osmium {
                                 OSMPBF::DenseInfo* denseinfo = dense->mutable_denseinfo();
 
                                 // iterate over all username string-ids
-                                for (int i=0, l= denseinfo->user_sid_size(); i<l; i++) {
+                                for (int i=0, l=denseinfo->user_sid_size(); i<l; ++i) {
                                     // map interim string-ids > 0 to real string ids
-                                    uint16_t user_sid = string_table.map_string_id(denseinfo->user_sid(i));
+                                    auto user_sid = string_table.map_string_id(denseinfo->user_sid(i));
 
                                     // delta encode the string-id
                                     denseinfo->set_user_sid(i, m_delta_user_sid.update(user_sid));
@@ -390,7 +391,7 @@ namespace osmium {
                     // test, if the ways-block has been allocated
                     if (pbf_ways) {
                         // iterate over all ways, passing them to the map_common_string_ids function
-                        for (int i=0, l=pbf_ways->ways_size(); i<l; i++) {
+                        for (int i=0, l=pbf_ways->ways_size(); i<l; ++i) {
                             map_common_string_ids(pbf_ways->mutable_ways(i));
                         }
                     }
@@ -398,7 +399,7 @@ namespace osmium {
                     // test, if the relations-block has been allocated
                     if (pbf_relations) {
                         // iterate over all relations
-                        for (int i=0, l=pbf_relations->relations_size(); i<l; i++) {
+                        for (int i=0, l=pbf_relations->relations_size(); i<l; ++i) {
                             // get a pointer to the relation
                             OSMPBF::Relation* relation = pbf_relations->mutable_relations(i);
 
@@ -407,7 +408,7 @@ namespace osmium {
 
                             // iterate over all relation members, mapping the interim string-ids
                             // of the role to real string ids
-                            for (int mi=0, ml=relation->roles_sid_size(); mi<ml; mi++) {
+                            for (int mi=0; mi < relation->roles_sid_size(); ++mi) {
                                 relation->set_roles_sid(mi, string_table.map_string_id(relation->roles_sid(mi)));
                             }
                         }
@@ -430,7 +431,7 @@ namespace osmium {
                     }
 
                     // iterate over all tags and map the interim-ids of the key and the value to real ids
-                    for (int i=0, l=in->keys_size(); i<l; i++) {
+                    for (int i=0, l=in->keys_size(); i<l; ++i) {
                         in->set_keys(i, string_table.map_string_id(in->keys(i)));
                         in->set_vals(i, string_table.map_string_id(in->vals(i)));
                     }
@@ -443,14 +444,14 @@ namespace osmium {
                  * convert a double lat or lon value to an int, respecting the current blocks granularity
                  */
                 int64_t lonlat2int(double lonlat) {
-                    return round(lonlat * OSMPBF::lonlat_resolution / location_granularity());
+                    return static_cast<int64_t>(std::round(lonlat * OSMPBF::lonlat_resolution / location_granularity()));
                 }
 
                 /**
                  * convert a timestamp to an int, respecting the current blocks granularity
                  */
                 int64_t timestamp2int(time_t timestamp) {
-                    return round(timestamp * (static_cast<double>(1000) / date_granularity()));
+                    return static_cast<int64_t>(std::round(timestamp * (1000.0 / date_granularity())));
                 }
 
                 /**
@@ -460,7 +461,7 @@ namespace osmium {
                  * TPBFObject is either OSMPBF::Node, OSMPBF::Way or OSMPBF::Relation.
                  */
                 template <class TPBFObject>
-                void apply_common_info(const osmium::Object& in, TPBFObject* out) {
+                void apply_common_info(const osmium::OSMObject& in, TPBFObject* out) {
                     // set the object-id
                     out->set_id(in.id());
 
@@ -477,10 +478,10 @@ namespace osmium {
                         if (m_add_visible) {
                             out_info->set_visible(in.visible());
                         }
-                        out_info->set_version(in.version());
+                        out_info->set_version(static_cast<::google::protobuf::int32>(in.version()));
                         out_info->set_timestamp(timestamp2int(in.timestamp()));
                         out_info->set_changeset(in.changeset());
-                        out_info->set_uid(in.uid());
+                        out_info->set_uid(static_cast<::google::protobuf::int32>(in.uid()));
                         out_info->set_user_sid(string_table.record_string(in.user()));
                     }
                 }
@@ -526,9 +527,6 @@ namespace osmium {
                     std::promise<std::string> promise;
                     m_output_queue.push(promise.get_future());
                     promise.set_value(serialize_blob("OSMData", pbf_primitive_block, m_use_compression));
-                    while (m_output_queue.size() > 10) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // XXX
-                    }
 
                     // clear the PrimitiveBlock struct
                     pbf_primitive_block.Clear();
@@ -566,7 +564,7 @@ namespace osmium {
                 void check_block_contents_counter() {
                     if (primitive_block_contents >= max_block_contents) {
                         store_primitive_block();
-                    } else if (primitive_block_size > (static_cast<uint32_t>(OSMPBF::max_uncompressed_blob_size) * buffer_fill_percent / 100)) {
+                    } else if (primitive_block_size > OSMPBF::max_uncompressed_blob_size * buffer_fill_percent / 100) {
                         if (debug && has_debug_level(1)) {
                             std::cerr << "storing primitive_block with only " << primitive_block_contents << " items, because its ByteSize (" << primitive_block_size << ") reached " <<
                                       (static_cast<float>(primitive_block_size) / static_cast<float>(OSMPBF::max_uncompressed_blob_size) * 100.0) << "% of the maximum blob-size" << std::endl;
@@ -575,7 +573,7 @@ namespace osmium {
                         store_primitive_block();
                     }
 
-                    primitive_block_contents++;
+                    ++primitive_block_contents;
                 }
 
 
@@ -595,8 +593,8 @@ namespace osmium {
 
                     // modify lat & lon to integers, respecting the block's granularity and copy
                     // the ints to the pbf-object
-                    pbf_node->set_lon(lonlat2int(node.lon()));
-                    pbf_node->set_lat(lonlat2int(node.lat()));
+                    pbf_node->set_lon(lonlat2int(node.location().lon_without_check()));
+                    pbf_node->set_lat(lonlat2int(node.location().lat_without_check()));
                 }
 
                 /**
@@ -612,10 +610,10 @@ namespace osmium {
                     dense->add_id(m_delta_id.update(node.id()));
 
                     // copy the longitude, delta encoded
-                    dense->add_lon(m_delta_lon.update(lonlat2int(node.lon())));
+                    dense->add_lon(m_delta_lon.update(lonlat2int(node.location().lon_without_check())));
 
                     // copy the latitude, delta encoded
-                    dense->add_lat(m_delta_lat.update(lonlat2int(node.lat())));
+                    dense->add_lat(m_delta_lat.update(lonlat2int(node.location().lat_without_check())));
 
                     // in the densenodes structure keys and vals are encoded in an intermixed
                     // array, individual nodes are seperated by a value of 0 (0 in the StringTable
@@ -633,7 +631,7 @@ namespace osmium {
                         // add a DenseInfo-Section to the PrimitiveGroup
                         OSMPBF::DenseInfo* denseinfo = dense->mutable_denseinfo();
 
-                        denseinfo->add_version(node.version());
+                        denseinfo->add_version(static_cast<::google::protobuf::int32>(node.version()));
 
                         if (m_add_visible) {
                             denseinfo->add_visible(node.visible());
@@ -646,7 +644,7 @@ namespace osmium {
                         denseinfo->add_changeset(m_delta_changeset.update(node.changeset()));
 
                         // copy the user id, delta encoded
-                        denseinfo->add_uid(m_delta_uid.update(node.uid()));
+                        denseinfo->add_uid(static_cast<::google::protobuf::int32>(m_delta_uid.update(node.uid())));
 
                         // record the user-name to the interim stringtable and copy the
                         // interim string-id to the pbf-object
@@ -669,9 +667,9 @@ namespace osmium {
                     // last way-node-id used for delta-encoding
                     Delta<int64_t> delta_id;
 
-                    for (auto& wn : way.nodes()) {
+                    for (const auto& node_ref : way.nodes()) {
                         // copy the way-node-id, delta encoded
-                        pbf_way->add_refs(delta_id.update(wn.ref()));
+                        pbf_way->add_refs(delta_id.update(node_ref.ref()));
                     }
 
                     // count up blob size by the size of the Way
@@ -692,7 +690,7 @@ namespace osmium {
 
                     Delta<int64_t> delta_id;
 
-                    for (auto& member : relation.members()) {
+                    for (const auto& member : relation.members()) {
                         // record the relation-member role to the interim stringtable and copy the
                         // interim string-id to the pbf-object
                         pbf_relation->add_roles_sid(string_table.record_string(member.role()));
@@ -717,7 +715,7 @@ namespace osmium {
                 /**
                  * Create PBFOutputFormat object from File.
                  */
-                PBFOutputFormat(const osmium::io::File& file, data_queue_type& output_queue) :
+                explicit PBFOutputFormat(const osmium::io::File& file, data_queue_type& output_queue) :
                     OutputFormat(file, output_queue),
                     pbf_header_block(),
                     pbf_primitive_block(),
@@ -804,7 +802,7 @@ namespace osmium {
 
                     // when the resulting file will carry history information, add
                     // HistoricalInformation as required feature
-                    if (this->m_file.has_multiple_object_versions()) {
+                    if (m_file.has_multiple_object_versions()) {
                         pbf_header_block.add_required_features("HistoricalInformation");
                     }
 
@@ -814,10 +812,10 @@ namespace osmium {
                     if (!header.boxes().empty()) {
                         OSMPBF::HeaderBBox* pbf_bbox = pbf_header_block.mutable_bbox();
                         osmium::Box box = header.joined_boxes();
-                        pbf_bbox->set_left(box.bottom_left().lon() * OSMPBF::lonlat_resolution);
-                        pbf_bbox->set_bottom(box.bottom_left().lat() * OSMPBF::lonlat_resolution);
-                        pbf_bbox->set_right(box.top_right().lon() * OSMPBF::lonlat_resolution);
-                        pbf_bbox->set_top(box.top_right().lat() * OSMPBF::lonlat_resolution);
+                        pbf_bbox->set_left(static_cast<::google::protobuf::int64>(box.bottom_left().lon() * OSMPBF::lonlat_resolution));
+                        pbf_bbox->set_bottom(static_cast<::google::protobuf::int64>(box.bottom_left().lat() * OSMPBF::lonlat_resolution));
+                        pbf_bbox->set_right(static_cast<::google::protobuf::int64>(box.top_right().lon() * OSMPBF::lonlat_resolution));
+                        pbf_bbox->set_top(static_cast<::google::protobuf::int64>(box.top_right().lat() * OSMPBF::lonlat_resolution));
                     }
 
                     std::string osmosis_replication_timestamp = header.get("osmosis_replication_timestamp");
@@ -828,7 +826,7 @@ namespace osmium {
 
                     std::string osmosis_replication_sequence_number = header.get("osmosis_replication_sequence_number");
                     if (!osmosis_replication_sequence_number.empty()) {
-                        pbf_header_block.set_osmosis_replication_sequence_number(atoll(osmosis_replication_sequence_number.c_str()));
+                        pbf_header_block.set_osmosis_replication_sequence_number(std::atoll(osmosis_replication_sequence_number.c_str()));
                     }
 
                     std::string osmosis_replication_base_url = header.get("osmosis_replication_base_url");

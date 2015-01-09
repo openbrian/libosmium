@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,13 +35,18 @@ DEALINGS IN THE SOFTWARE.
 
 #include <cassert>
 #include <iterator>
+#include <type_traits>
 
 #include <osmium/osm/diff_object.hpp>
 
 namespace osmium {
 
+    class OSMObject;
+
     template <class TBasicIterator>
     class DiffIterator : public std::iterator<std::input_iterator_tag, const osmium::DiffObject> {
+
+        static_assert(std::is_base_of<osmium::OSMObject, typename TBasicIterator::value_type>::value, "TBasicIterator::value_type must derive from osmium::OSMObject");
 
         TBasicIterator m_prev;
         TBasicIterator m_curr;
@@ -49,7 +54,7 @@ namespace osmium {
 
         const TBasicIterator m_end;
 
-        mutable osmium::DiffObject m_diff {};
+        mutable osmium::DiffObject m_diff;
 
         void set_diff() const {
             assert(m_curr != m_end);
@@ -69,18 +74,18 @@ namespace osmium {
 
     public:
 
-        DiffIterator(TBasicIterator begin, TBasicIterator end) :
+        explicit DiffIterator(TBasicIterator begin, TBasicIterator end) :
             m_prev(begin),
             m_curr(begin),
             m_next(begin == end ? begin : ++begin),
             m_end(end) {
         }
 
-        DiffIterator(const DiffIterator& other) = default;
-        DiffIterator& operator=(const DiffIterator& other) = default;
+        DiffIterator(const DiffIterator&) = default;
+        DiffIterator& operator=(const DiffIterator&) = default;
 
-        DiffIterator(DiffIterator&& other) = default;
-        DiffIterator& operator=(DiffIterator&& other) = default;
+        DiffIterator(DiffIterator&&) = default;
+        DiffIterator& operator=(DiffIterator&&) = default;
 
         DiffIterator& operator++() {
             m_prev = std::move(m_curr);

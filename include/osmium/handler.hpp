@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013,2014 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -35,16 +35,29 @@ DEALINGS IN THE SOFTWARE.
 
 namespace osmium {
 
+    class OSMObject;
     class Node;
     class Way;
     class Relation;
+    class Area;
     class Changeset;
+    class TagList;
+    class WayNodeList;
+    class RelationMemberList;
+    class OuterRing;
+    class InnerRing;
 
+    /**
+     * @brief Osmium handlers provide callbacks for OSM objects
+     */
     namespace handler {
 
         class Handler {
 
         public:
+
+            void osm_object(const osmium::OSMObject&) const {
+            }
 
             void node(const osmium::Node&) const {
             }
@@ -55,37 +68,28 @@ namespace osmium {
             void relation(const osmium::Relation&) const {
             }
 
+            void area(const osmium::Area&) const {
+            }
+
             void changeset(const osmium::Changeset&) const {
             }
 
-            void init() const {
+            void tag_list(const osmium::TagList&) const {
             }
 
-            void before_nodes() const {
+            void way_node_list(const osmium::WayNodeList&) const {
             }
 
-            void after_nodes() const {
+            void relation_member_list(const osmium::RelationMemberList&) const {
             }
 
-            void before_ways() const {
+            void outer_ring(const osmium::OuterRing&) const {
             }
 
-            void after_ways() const {
+            void inner_ring(const osmium::InnerRing&) const {
             }
 
-            void before_relations() const {
-            }
-
-            void after_relations() const {
-            }
-
-            void before_changesets() const {
-            }
-
-            void after_changesets() const {
-            }
-
-            void done() const {
+            void flush() const {
             }
 
         }; // class Handler
