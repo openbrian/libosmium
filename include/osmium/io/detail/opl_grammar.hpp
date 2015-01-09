@@ -3,9 +3,9 @@
 
 /*
 
-This file is part of Osmium (http://osmcode.org/osmium).
+This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013-2015 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -34,7 +34,7 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #define BOOST_SPIRIT_USE_PHOENIX_V3 1
-// boost
+
 #include <boost/version.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
@@ -49,390 +49,380 @@ DEALINGS IN THE SOFTWARE.
 # include <boost_unicode_iterator.hpp>
 #endif
 
-// osmium
-#include <osmium/osm/builder.hpp>
+#include <osmium/builder/builder.hpp>
+#include <osmium/builder/osm_object_builder.hpp>
 #include <osmium/osm/node.hpp>
 
-namespace osmium { namespace io { namespace detail {
+namespace osmium {
 
-namespace qi = boost::spirit::qi;
-namespace phoenix = boost::phoenix;
-namespace fusion = boost::fusion;
-namespace standard_wide =  boost::spirit::standard_wide;
-using standard_wide::space_type;
-using namespace boost::phoenix;
+    namespace io {
 
-template <typename Buffer>
-struct commit_buffer
-{
-    typedef void result_type;
-    commit_buffer(Buffer & buffer)
-        : buffer_(buffer) {}
+        namespace detail {
 
-    void operator() () const
-    {
-        buffer_.commit();
-    }
-    Buffer & buffer_;
-};
+            namespace qi = boost::spirit::qi;
+            namespace phoenix = boost::phoenix;
+            namespace fusion = boost::fusion;
+            namespace standard_wide = boost::spirit::standard_wide;
+            using standard_wide::space_type;
+            using namespace boost::phoenix;
 
-struct osm_id
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->object().id(val);
-    }
-};
+            template <typename TBuffer>
+            struct commit_buffer {
+                typedef void result_type;
 
-struct osm_version
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->object().version(val);
-    }
-};
+                commit_buffer(TBuffer& buffer)
+                    : buffer_(buffer) {}
 
-struct osm_visible
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->object().visible(val);
-    }
-};
+                void operator()() const {
+                    buffer_.commit();
+                }
 
-struct osm_changeset
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->object().changeset(val);
-    }
-};
+                TBuffer& buffer_;
+            };
 
-struct osm_user_id
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->object().uid(val);
-    }
-};
+            struct osm_id {
+                typedef void result_type;
 
-struct osm_user_name
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 const& val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->add_user(val.c_str());
-    }
-};
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->object().set_id(val);
+                }
+            };
 
-struct osm_timestamp
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 const& val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        builder->object().timestamp(osmium::Timestamp(val.c_str()));
-    }
-};
+            struct osm_version {
+                typedef void result_type;
 
-template <typename Buffer>
-struct osm_tags
-{
-    typedef void result_type;
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->object().set_version(val);
+                }
+            };
 
-    osm_tags(Buffer & buffer)
-        : buffer_(buffer) {}
+            struct osm_visible {
+                typedef void result_type;
 
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 const& tags) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        osmium::osm::TagListBuilder tag_builder(buffer_, builder);
-        for (auto const& tag : tags)
-        {
-            tag_builder.add_tag(std::get<0>(tag).c_str(), std::get<1>(tag).c_str());
-        }
-    }
-    Buffer & buffer_;
-};
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->object().set_visible(val);
+                }
+            };
+
+            struct osm_changeset {
+                typedef void result_type;
+
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->object().set_changeset(val);
+                }
+            };
+
+            struct osm_user_id {
+                typedef void result_type;
+
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->object().set_uid(val);
+                }
+            };
+
+            struct osm_user_name {
+                typedef void result_type;
+
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 const& val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->add_user(val.c_str());
+                }
+            };
+
+            struct osm_timestamp {
+                typedef void result_type;
+
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 const& val) const {
+                    BOOST_ASSERT(builder != 0);
+                    builder->object().set_timestamp(osmium::Timestamp(val.c_str()));
+                }
+            };
+
+            template <typename TBuffer>
+            struct osm_tags {
+                typedef void result_type;
+
+                osm_tags(TBuffer& buffer)
+                    : buffer_(buffer) {}
+
+                template <typename T0, typename T1>
+                void operator() (T0 builder, T1 const& tags) const
+                {
+                    BOOST_ASSERT(builder != 0);
+                    osmium::builder::TagListBuilder tag_builder(buffer_, builder);
+                    for (auto const& tag : tags)
+                    {
+                        tag_builder.add_tag(std::get<0>(tag).c_str(), std::get<1>(tag).c_str());
+                    }
+                }
+                TBuffer& buffer_;
+            };
 
 
-template <typename Buffer>
-struct osm_way_nodes
-{
-    typedef void result_type;
+            template <typename TBuffer>
+            struct osm_way_nodes {
+                typedef void result_type;
 
-    osm_way_nodes(Buffer & buffer)
-        : buffer_(buffer) {}
+                osm_way_nodes(TBuffer& buffer)
+                    : buffer_(buffer) {}
 
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 const& nodes) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        osmium::osm::WayNodeListBuilder way_node_builder(buffer_, builder);
-        for (auto const& node : nodes)
-        {
-            way_node_builder.add_way_node(node);
-        }
-    }
+                template <typename T0, typename T1>
+                void operator() (T0 builder, T1 const& nodes) const
+                {
+                    BOOST_ASSERT(builder != 0);
+                    osmium::builder::WayNodeListBuilder way_node_builder(buffer_, builder);
+                    for (auto const& node : nodes)
+                    {
+                        way_node_builder.add_node_ref(node);
+                    }
+                }
 
-    Buffer & buffer_;
-};
+                TBuffer& buffer_;
+            };
 
-template <typename Buffer>
-struct osm_relation_members
-{
-    typedef void result_type;
+            template <typename TBuffer>
+            struct osm_relation_members {
+                typedef void result_type;
 
-    osm_relation_members(Buffer & buffer)
-        : buffer_(buffer) {}
+                osm_relation_members(TBuffer& buffer)
+                    : buffer_(buffer) {}
 
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 const& members) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        osmium::osm::RelationMemberListBuilder relation_member_builder(buffer_, builder);
-        for (auto const& member : members)
-        {
-            relation_member_builder.add_member(std::get<0>(member), std::get<1>(member), std::get<2>(member).c_str());
-        }
-    }
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 const& members) const {
+                    BOOST_ASSERT(builder != 0);
+                    osmium::builder::RelationMemberListBuilder relation_member_builder(buffer_, builder);
+                    for (auto const& member : members) {
+                        relation_member_builder.add_member(std::get<0>(member), std::get<1>(member), std::get<2>(member).c_str());
+                    }
+                }
 
-    Buffer & buffer_;
-};
+                TBuffer& buffer_;
+            };
 
-struct osm_location
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    void operator() (T0 builder, T1 const& val) const
-    {
-        BOOST_ASSERT( builder!=0 );
-        osmium::Node& node = builder->object();
-        node.location(osmium::Location(std::get<0>(val),std::get<1>(val)));
-    }
-};
+            struct osm_location {
+                typedef void result_type;
 
-struct utf8_encode
-{
-    typedef void result_type;
-    typedef boost::u32_to_u8_iterator<std::u32string::const_iterator> u32to8type;
-    template <typename T0, typename T1>
-    result_type operator() (T0 & u8str, T1 const& u32str) const
-    {
-        u32to8type itr(u32str.cbegin());
-        u32to8type end(u32str.cend());
-        for( ; itr!=end; ++itr)
-        {
-            u8str.push_back(*itr);
-        }
-    }
-};
+                template <typename T0, typename T1>
+                void operator()(T0 builder, T1 const& val) const {
+                    BOOST_ASSERT(builder != 0);
+                    osmium::Node& node = builder->object();
+                    node.set_location(osmium::Location(std::get<0>(val), std::get<1>(val)));
+                }
+            };
 
-struct append_char
-{
-    typedef void result_type;
-    template <typename T0, typename T1>
-    result_type operator() (T0 & u8str, T1 ch) const
-    {
-        u8str.push_back(ch);
-    }
-};
+            struct utf8_encode {
+                typedef void result_type;
+                typedef boost::u32_to_u8_iterator<std::u32string::const_iterator> u32to8type;
 
-template <typename Iterator, typename Buffer>
-struct opl_grammar : qi::grammar<Iterator>
-{
-    opl_grammar(Buffer & buffer)
-        : opl_grammar::base_type(start, "opl"),
-          buffer_(buffer),
-          osm_tags_(buffer_),
-          osm_way_nodes_(buffer_),
-          osm_relation_members_(buffer_),
-          commit_buffer_(buffer_)
-    {
-        using qi::lit;
-        using qi::double_;
-        using qi::int_;
-        using qi::long_long;
-        using qi::no_skip;
-        using qi::omit;
-        using qi::_val;
-        using qi::_a;
-        using qi::_r1;
-        using qi::_1;
-        using qi::_2;
-        using qi::_3;
-        using qi::_4;
-        using qi::fail;
-        using qi::eol;
-        using qi::eps;
-        using qi::on_error;
-        using standard_wide::char_;
-        using phoenix::new_;
-        using phoenix::ref;
-        using phoenix::delete_;
-        using phoenix::at;
+                template <typename T0, typename T1>
+                result_type operator()(T0 & u8str, T1 const& u32str) const {
+                    u32to8type itr(u32str.cbegin());
+                    u32to8type end(u32str.cend());
+                    for( ; itr!=end; ++itr) {
+                        u8str.push_back(*itr);
+                    }
+                }
+            };
 
-        status.add
-            ("V", true)
-            ("D", false)
-            ;
+            struct append_char {
+                typedef void result_type;
 
-        item_type.add
-            ("n", osmium::item_type::node)
-            ("w", osmium::item_type::way)
-            ("r", osmium::item_type::relation)
-            ("c", osmium::item_type::changeset)
-            ;
+                template <typename T0, typename T1>
+                result_type operator()(T0 & u8str, T1 ch) const {
+                    u8str.push_back(ch);
+                }
+            };
 
-        // start
-        start = object % eol
-            ;
+            template <typename Iterator, typename TBuffer>
+            struct opl_grammar : qi::grammar<Iterator>
+            {
+                opl_grammar(TBuffer & buffer)
+                    : opl_grammar::base_type(start, "opl"),
+                    buffer_(buffer),
+                    osm_tags_(buffer_),
+                    osm_way_nodes_(buffer_),
+                    osm_relation_members_(buffer_),
+                    commit_buffer_(buffer_)
+                {
+                    using qi::lit;
+                    using qi::double_;
+                    using qi::int_;
+                    using qi::long_long;
+                    using qi::no_skip;
+                    using qi::omit;
+                    using qi::_val;
+                    using qi::_a;
+                    using qi::_r1;
+                    using qi::_1;
+                    using qi::_2;
+                    using qi::_3;
+                    using qi::_4;
+                    using qi::fail;
+                    using qi::eol;
+                    using qi::eps;
+                    using qi::on_error;
+                    using standard_wide::char_;
+                    using phoenix::new_;
+                    using phoenix::ref;
+                    using phoenix::delete_;
+                    using phoenix::at;
 
-        object = node | way | relation
-            ;
+                    status.add
+                        ("V", true)
+                        ("D", false)
+                        ;
 
-        node = lit('n')[_a = new_<osmium::osm::NodeBuilder>(std::ref(buffer_))]
-            > long_long[osm_id_(_a,_1)] > lit(' ')
-            > version[osm_version_(_a,_1)] > lit(' ')
-            > visible[osm_visible_(_a,_1)] > lit(' ')
-            > changeset[osm_changeset_(_a,_1)] > lit(' ')
-            > timestamp[osm_timestamp_(_a,_1)] > lit(' ')
-            > user_id[osm_user_id_(_a,_1)] > lit(' ')
-            > user_name[osm_user_name_(_a,_1)] > lit(' ')
-            > tags[osm_tags_(_a,_1)] > lit(' ')
-            > coord[osm_location_(_a,_1)]
-            > eps[delete_(_a)][commit_buffer_()]
-            ;
+                    item_type.add
+                        ("n", osmium::item_type::node)
+                        ("w", osmium::item_type::way)
+                        ("r", osmium::item_type::relation)
+                        ("c", osmium::item_type::changeset)
+                        ;
 
-        way = lit('w')[_a = new_<osmium::osm::WayBuilder>(std::ref(buffer_))]
-            > long_long[osm_id_(_a,_1)] > lit(' ')
-            > version[osm_version_(_a,_1)] > lit(' ')
-            > visible[osm_visible_(_a,_1)] > lit(' ')
-            > changeset[osm_changeset_(_a,_1)] > lit(' ')
-            > timestamp[osm_timestamp_(_a,_1)] > lit(' ')
-            > user_id[osm_user_id_(_a,_1)] > lit(' ')
-            > user_name[osm_user_name_(_a,_1)] > lit(' ')
-            > tags[osm_tags_(_a,_1)] > lit(' ')
-            > lit('N') > -((lit('n') > long_long) % lit(','))[osm_way_nodes_(_a,_1)]
-            > eps[delete_(_a)][commit_buffer_()]
-            ;
+                    // start
+                    start = object % eol
+                        ;
 
-        relation = lit('r')[_a = new_<osmium::osm::RelationBuilder>(std::ref(buffer_))]
-            > long_long[osm_id_(_a,_1)] > lit(' ')
-            > version[osm_version_(_a,_1)] > lit(' ')
-            > visible[osm_visible_(_a,_1)] > lit(' ')
-            > changeset[osm_changeset_(_a,_1)] > lit(' ')
-            > timestamp[osm_timestamp_(_a,_1)] > lit(' ')
-            > user_id[osm_user_id_(_a,_1)] > lit(' ')
-            > user_name[osm_user_name_(_a,_1)] > lit(' ')
-            > tags[osm_tags_(_a,_1)] > lit(' ')
-            > lit('M') > -(member % lit(','))[osm_relation_members_(_a,_1)]
-            > eps[delete_(_a)][commit_buffer_()]
-            ;
+                    object = node | way | relation
+                        ;
 
-        member = item_type > long_long > lit('@') > osm_string
-            ;
+                    node = lit('n')[_a = new_<osmium::builder::NodeBuilder>(std::ref(buffer_))]
+                        > long_long[osm_id_(_a,_1)] > lit(' ')
+                        > version[osm_version_(_a,_1)] > lit(' ')
+                        > visible[osm_visible_(_a,_1)] > lit(' ')
+                        > changeset[osm_changeset_(_a,_1)] > lit(' ')
+                        > timestamp[osm_timestamp_(_a,_1)] > lit(' ')
+                        > user_id[osm_user_id_(_a,_1)] > lit(' ')
+                        > user_name[osm_user_name_(_a,_1)] > lit(' ')
+                        > tags[osm_tags_(_a,_1)] > lit(' ')
+                        > coord[osm_location_(_a,_1)]
+                        > eps[delete_(_a)][commit_buffer_()]
+                        ;
 
-        coord = lit('x') > double_ > lit(" y") > double_
-            ;
+                    way = lit('w')[_a = new_<osmium::builder::WayBuilder>(std::ref(buffer_))]
+                        > long_long[osm_id_(_a,_1)] > lit(' ')
+                        > version[osm_version_(_a,_1)] > lit(' ')
+                        > visible[osm_visible_(_a,_1)] > lit(' ')
+                        > changeset[osm_changeset_(_a,_1)] > lit(' ')
+                        > timestamp[osm_timestamp_(_a,_1)] > lit(' ')
+                        > user_id[osm_user_id_(_a,_1)] > lit(' ')
+                        > user_name[osm_user_name_(_a,_1)] > lit(' ')
+                        > tags[osm_tags_(_a,_1)] > lit(' ')
+                        > lit('N') > -((lit('n') > long_long) % lit(','))[osm_way_nodes_(_a,_1)]
+                        > eps[delete_(_a)][commit_buffer_()]
+                        ;
 
-        tags = lit('T') > -( tag  % lit(','))
-            ;
+                    relation = lit('r')[_a = new_<osmium::builder::RelationBuilder>(std::ref(buffer_))]
+                        > long_long[osm_id_(_a,_1)] > lit(' ')
+                        > version[osm_version_(_a,_1)] > lit(' ')
+                        > visible[osm_visible_(_a,_1)] > lit(' ')
+                        > changeset[osm_changeset_(_a,_1)] > lit(' ')
+                        > timestamp[osm_timestamp_(_a,_1)] > lit(' ')
+                        > user_id[osm_user_id_(_a,_1)] > lit(' ')
+                        > user_name[osm_user_name_(_a,_1)] > lit(' ')
+                        > tags[osm_tags_(_a,_1)] > lit(' ')
+                        > lit('M') > -(member % lit(','))[osm_relation_members_(_a,_1)]
+                        > eps[delete_(_a)][commit_buffer_()]
+                        ;
 
-        tag = osm_string
-            >> lit('=')
-            >> osm_string
-            ;
+                    member = item_type > long_long > lit('@') > osm_string
+                        ;
 
-        version = lit('v') > int_
-            ;
+                    coord = lit('x') > double_ > lit(" y") > double_
+                        ;
 
-        visible = lit('d') > status
-            ;
+                    tags = lit('T') > -( tag  % lit(','))
+                        ;
 
-        changeset = lit('c') > int_
-            ;
+                    tag = osm_string
+                        >> lit('=')
+                        >> osm_string
+                        ;
 
-        timestamp = lit('t') > +~char_(' ')
-            ;
+                    version = lit('v') > int_
+                        ;
 
-        user_id = lit('i') > int_
-            ;
+                    visible = lit('d') > status
+                        ;
 
-        user_name = lit('u') > osm_string
-            ;
+                    changeset = lit('c') > int_
+                        ;
 
-        osm_string = *(osmium_escaped_string[utf8_encode_(_val,_1)]
-                       | (~char_(" %=,@\n\r\t"))[append_char_(_val,_1)])
-            ;
+                    timestamp = lit('t') > +~char_(' ')
+                        ;
 
-        osmium_escaped_string = +(lit('%') > hex4)
-            ;
+                    user_id = lit('i') > int_
+                        ;
 
-    }
+                    user_name = lit('u') > osm_string
+                        ;
 
-    Buffer & buffer_;
-    boost::phoenix::function<osm_id> osm_id_;
-    boost::phoenix::function<osm_version> osm_version_;
-    boost::phoenix::function<osm_visible> osm_visible_;
-    boost::phoenix::function<osm_changeset> osm_changeset_;
-    boost::phoenix::function<osm_user_id> osm_user_id_;
-    boost::phoenix::function<osm_user_name> osm_user_name_;
-    boost::phoenix::function<osm_timestamp> osm_timestamp_;
-    boost::phoenix::function<osm_location> osm_location_;
-    boost::phoenix::function<osm_tags<Buffer> > osm_tags_;
-    boost::phoenix::function<osm_way_nodes<Buffer> > osm_way_nodes_;
-    boost::phoenix::function<osm_relation_members<Buffer> > osm_relation_members_;
-    boost::phoenix::function<commit_buffer<Buffer> > commit_buffer_;
-    boost::phoenix::function<utf8_encode> utf8_encode_;
-    boost::phoenix::function<append_char> append_char_;
-    //
-    qi::rule<Iterator> start;
-    qi::rule<Iterator> object;
-    qi::rule<Iterator, qi::locals<osmium::osm::NodeBuilder*> > node;
-    qi::rule<Iterator, qi::locals<osmium::osm::WayBuilder*> > way;
-    qi::rule<Iterator, qi::locals<osmium::osm::RelationBuilder*> > relation;
-    qi::rule<Iterator, std::tuple<osmium::item_type,long long, std::string>()> member;
-    qi::rule<Iterator, std::tuple<double,double>()> coord;
-    qi::rule<Iterator> type;
-    qi::rule<Iterator,int()> version;
-    qi::rule<Iterator,bool()> visible;
-    qi::symbols<char, bool> status;
-    qi::symbols<char, osmium::item_type> item_type;
-    qi::rule<Iterator, int()> changeset;
-    qi::rule<Iterator, int()> user_id;
-    qi::rule<Iterator, std::string()> user_name;
-    qi::rule<Iterator, std::vector<std::tuple<std::string,std::string> >()> tags;
-    qi::rule<Iterator, std::tuple<std::string,std::string>()> tag;
-    qi::rule<Iterator, std::string()> key;
-    qi::rule<Iterator, std::string()> value;
-    qi::rule<Iterator, std::string()> timestamp; // yyyy-mm-ddThh:mm:ssZ ISO 8601
-    qi::rule<Iterator, std::u32string()> osmium_escaped_string;
-    qi::rule<Iterator, std::string()> osm_string;
-    qi::uint_parser< wchar_t, 16, 4, 4 > hex4;
-};
+                    osm_string = *(osmium_escaped_string[utf8_encode_(_val,_1)]
+                                | (~char_(" %=,@\n\r\t"))[append_char_(_val,_1)])
+                        ;
 
-} // namespace detail
-} // namespace io
+                    osmium_escaped_string = +(lit('%') > hex4)
+                        ;
+
+                }
+
+                TBuffer& buffer_;
+                boost::phoenix::function<osm_id> osm_id_;
+                boost::phoenix::function<osm_version> osm_version_;
+                boost::phoenix::function<osm_visible> osm_visible_;
+                boost::phoenix::function<osm_changeset> osm_changeset_;
+                boost::phoenix::function<osm_user_id> osm_user_id_;
+                boost::phoenix::function<osm_user_name> osm_user_name_;
+                boost::phoenix::function<osm_timestamp> osm_timestamp_;
+                boost::phoenix::function<osm_location> osm_location_;
+                boost::phoenix::function<osm_tags<TBuffer> > osm_tags_;
+                boost::phoenix::function<osm_way_nodes<TBuffer> > osm_way_nodes_;
+                boost::phoenix::function<osm_relation_members<TBuffer> > osm_relation_members_;
+                boost::phoenix::function<commit_buffer<TBuffer> > commit_buffer_;
+                boost::phoenix::function<utf8_encode> utf8_encode_;
+                boost::phoenix::function<append_char> append_char_;
+                //
+                qi::rule<Iterator> start;
+                qi::rule<Iterator> object;
+                qi::rule<Iterator, qi::locals<osmium::builder::NodeBuilder*> > node;
+                qi::rule<Iterator, qi::locals<osmium::builder::WayBuilder*> > way;
+                qi::rule<Iterator, qi::locals<osmium::builder::RelationBuilder*> > relation;
+                qi::rule<Iterator, std::tuple<osmium::item_type,long long, std::string>()> member;
+                qi::rule<Iterator, std::tuple<double,double>()> coord;
+                qi::rule<Iterator> type;
+                qi::rule<Iterator,int()> version;
+                qi::rule<Iterator,bool()> visible;
+                qi::symbols<char, bool> status;
+                qi::symbols<char, osmium::item_type> item_type;
+                qi::rule<Iterator, int()> changeset;
+                qi::rule<Iterator, int()> user_id;
+                qi::rule<Iterator, std::string()> user_name;
+                qi::rule<Iterator, std::vector<std::tuple<std::string,std::string> >()> tags;
+                qi::rule<Iterator, std::tuple<std::string,std::string>()> tag;
+                qi::rule<Iterator, std::string()> key;
+                qi::rule<Iterator, std::string()> value;
+                qi::rule<Iterator, std::string()> timestamp; // yyyy-mm-ddThh:mm:ssZ ISO 8601
+                qi::rule<Iterator, std::u32string()> osmium_escaped_string;
+                qi::rule<Iterator, std::string()> osm_string;
+                qi::uint_parser< wchar_t, 16, 4, 4 > hex4;
+            };
+
+        } // namespace detail
+
+    } // namespace io
+
 } // namespace osmium
 
 #endif // OSMIUM_IO_DETAIL_OPL_GRAMMAR_HPP
