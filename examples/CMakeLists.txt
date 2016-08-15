@@ -19,6 +19,7 @@ set(EXAMPLES
     read
     serdump
     use_node_cache
+    splitter
     CACHE STRING "Example programs"
 )
 
