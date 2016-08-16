@@ -20,6 +20,7 @@ set(EXAMPLES
     serdump
     use_node_cache
     splitter
+    bugfinder
     CACHE STRING "Example programs"
 )
 
