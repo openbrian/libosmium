@@ -1,5 +1,5 @@
-#ifndef OSMIUM_UTIL_ITERATOR_HPP
-#define OSMIUM_UTIL_ITERATOR_HPP
+#ifndef OSMIUM_IO_OPL_INPUT_HPP
+#define OSMIUM_IO_OPL_INPUT_HPP
 
 /*
 
@@ -33,52 +33,14 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <cstddef>
-#include <type_traits>
-#include <utility>
+/**
+ * @file
+ *
+ * Include this file if you want to read OSM OPL files.
+ *
+ */
 
-namespace osmium {
+#include <osmium/io/reader.hpp> // IWYU pragma: export
+#include <osmium/io/detail/opl_input_format.hpp> // IWYU pragma: export
 
-    template <typename It, typename P = std::pair<It, It>>
-    struct iterator_range : public P {
-
-        using iterator = It;
-
-        iterator_range(P&& p) :
-            P(std::forward<P>(p)) {
-        }
-/*
-        It begin() {
-            return this->first;
-        }
-
-        It end() {
-            return this->second;
-        }
-*/
-        It begin() const {
-            return this->first;
-        }
-
-        It end() const {
-            return this->second;
-        }
-
-        size_t empty() const {
-            return begin() == end();
-        }
-
-    }; // struct iterator_range
-
-    /**
-     * Helper function to create iterator_range from std::pair.
-     */
-    template <typename P, typename It = typename P::first_type>
-    inline iterator_range<It> make_range(P&& p) {
-        static_assert(std::is_same<P, std::pair<It, It>>::value, "make_range needs pair of iterators as argument");
-        return iterator_range<It>(std::forward<P>(p));
-    }
-
-} // namespace osmium
-
-#endif // OSMIUM_UTIL_ITERATOR_HPP
+#endif // OSMIUM_IO_OPL_INPUT_HPP

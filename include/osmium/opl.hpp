@@ -1,5 +1,5 @@
-#ifndef OSMIUM_UTIL_ITERATOR_HPP
-#define OSMIUM_UTIL_ITERATOR_HPP
+#ifndef OSMIUM_OPL_HPP
+#define OSMIUM_OPL_HPP
 
 /*
 
@@ -33,52 +33,35 @@ DEALINGS IN THE SOFTWARE.
 
 */
 
-#include <cstddef>
-#include <type_traits>
-#include <utility>
+#include <osmium/memory/buffer.hpp>
+#include <osmium/io/detail/opl_parser_functions.hpp>
 
 namespace osmium {
 
-    template <typename It, typename P = std::pair<It, It>>
-    struct iterator_range : public P {
-
-        using iterator = It;
-
-        iterator_range(P&& p) :
-            P(std::forward<P>(p)) {
-        }
-/*
-        It begin() {
-            return this->first;
-        }
-
-        It end() {
-            return this->second;
-        }
-*/
-        It begin() const {
-            return this->first;
-        }
-
-        It end() const {
-            return this->second;
-        }
-
-        size_t empty() const {
-            return begin() == end();
-        }
-
-    }; // struct iterator_range
-
     /**
-     * Helper function to create iterator_range from std::pair.
+     * Parses one line in OPL format. The line must not have a newline
+     * character at the end. Buffer.commit() is called automatically if the
+     * write succeeded.
+     *
+     * @param data Line must be in this zero-delimited string.
+     * @param buffer Result will be written to this buffer.
+     *
+     * @returns true if an entity was parsed, false otherwise (for instance
+     *          when the line is empty).
+     * @throws osmium::opl_error If the parsing fails.
      */
-    template <typename P, typename It = typename P::first_type>
-    inline iterator_range<It> make_range(P&& p) {
-        static_assert(std::is_same<P, std::pair<It, It>>::value, "make_range needs pair of iterators as argument");
-        return iterator_range<It>(std::forward<P>(p));
+    inline bool opl_parse(const char* data, osmium::memory::Buffer& buffer) {
+        try {
+            bool wrote_something = osmium::io::detail::opl_parse_line(0, data, buffer);
+            buffer.commit();
+            return wrote_something;
+        } catch (const osmium::opl_error&) {
+            buffer.rollback();
+            throw;
+        }
     }
 
 } // namespace osmium
 
-#endif // OSMIUM_UTIL_ITERATOR_HPP
+
+#endif // OSMIUM_OPL_HPP

@@ -47,7 +47,6 @@ DEALINGS IN THE SOFTWARE.
 #include <osmium/osm/tag.hpp>
 #include <osmium/osm/way.hpp>
 #include <osmium/relations/collector.hpp>
-#include <osmium/relations/detail/member_meta.hpp>
 
 namespace osmium {
 
@@ -164,7 +163,7 @@ namespace osmium {
                         m_stats += assembler.stats();
                         possibly_flush_output_buffer();
                     }
-                } catch (osmium::invalid_location&) {
+                } catch (const osmium::invalid_location&) {
                     // XXX ignore
                 }
             }
@@ -186,7 +185,7 @@ namespace osmium {
                     assembler(relation, ways, m_output_buffer);
                     m_stats += assembler.stats();
                     possibly_flush_output_buffer();
-                } catch (osmium::invalid_location&) {
+                } catch (const osmium::invalid_location&) {
                     // XXX ignore
                 }
             }

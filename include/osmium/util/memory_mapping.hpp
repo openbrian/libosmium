@@ -35,6 +35,7 @@ DEALINGS IN THE SOFTWARE.
 
 #include <cassert>
 #include <cerrno>
+#include <cstddef>
 #include <stdexcept>
 #include <system_error>
 
@@ -214,7 +215,7 @@ private:
             ~MemoryMapping() noexcept {
                 try {
                     unmap();
-                } catch (std::system_error&) {
+                } catch (const std::system_error&) {
                     // Ignore any exceptions because destructor must not throw.
                 }
             }

@@ -34,7 +34,6 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include <cstddef>
-#include <stdexcept>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -43,7 +42,6 @@ DEALINGS IN THE SOFTWARE.
 #include <osmium/io/file_format.hpp>
 #include <osmium/io/file_compression.hpp>
 #include <osmium/util/options.hpp>
-#include <osmium/util/compatibility.hpp>
 
 namespace osmium {
 

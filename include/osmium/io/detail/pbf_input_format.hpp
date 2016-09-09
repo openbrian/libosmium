@@ -38,25 +38,22 @@ DEALINGS IN THE SOFTWARE.
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <future>
 #include <memory>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <type_traits>
 
 #include <protozero/pbf_message.hpp>
+#include <protozero/types.hpp>
 
 #include <osmium/io/detail/input_format.hpp>
 #include <osmium/io/detail/pbf.hpp> // IWYU pragma: export
 #include <osmium/io/detail/pbf_decoder.hpp>
 #include <osmium/io/detail/protobuf_tags.hpp>
-#include <osmium/io/error.hpp>
-#include <osmium/io/file.hpp>
+#include <osmium/io/detail/queue_util.hpp>
 #include <osmium/io/file_format.hpp>
-#include <osmium/osm.hpp>
+#include <osmium/io/header.hpp>
 #include <osmium/osm/entity_bits.hpp>
-#include <osmium/osm/object.hpp>
-#include <osmium/osm/timestamp.hpp>
 #include <osmium/thread/pool.hpp>
 #include <osmium/thread/util.hpp>
 #include <osmium/util/config.hpp>
@@ -106,7 +103,7 @@ namespace osmium {
                     try {
                         const std::string input_data = read_from_input_queue(sizeof(size_in_network_byte_order));
                         size_in_network_byte_order = *reinterpret_cast<const uint32_t*>(input_data.data());
-                    } catch (osmium::pbf_error&) {
+                    } catch (const osmium::pbf_error&) {
                         return 0; // EOF
                     }
 
