@@ -36,6 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
+#include <string>
 #include <system_error>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -67,7 +68,7 @@ namespace osmium {
 #ifdef _MSC_VER
             // Windows implementation
             // https://msdn.microsoft.com/en-us/library/dfbc2kec.aspx
-            auto size = ::_filelengthi64(fd);
+            const auto size = ::_filelengthi64(fd);
             if (size == -1L) {
                 throw std::system_error(errno, std::system_category(), "_filelengthi64 failed");
             }
@@ -80,6 +81,44 @@ namespace osmium {
             }
             return size_t(s.st_size);
 #endif
+        }
+
+        /**
+         * Get file size.
+         * This is a small wrapper around a system call.
+         *
+         * @param name File name
+         * @returns file size
+         * @throws std::system_error If system call failed
+         */
+        inline size_t file_size(const char* name) {
+#ifdef _MSC_VER
+            // Windows implementation
+            // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
+            struct _stat64 s;
+            if (::_stati64(name, &s) != 0) {
+                throw std::system_error(errno, std::system_category(), "_stati64 failed");
+            }
+#else
+            // Unix implementation
+            struct stat s;
+            if (::stat(name, &s) != 0) {
+                throw std::system_error(errno, std::system_category(), "stat failed");
+            }
+#endif
+            return size_t(s.st_size);
+        }
+
+        /**
+         * Get file size.
+         * This is a small wrapper around a system call.
+         *
+         * @param name File name
+         * @returns file size
+         * @throws std::system_error If system call failed
+         */
+        inline size_t file_size(const std::string& name) {
+            return file_size(name.c_str());
         }
 
         /**
@@ -113,6 +152,37 @@ namespace osmium {
 #else
             // Unix implementation
             return size_t(::sysconf(_SC_PAGESIZE));
+#endif
+        }
+
+        /**
+         * Get current offset into file.
+         *
+         * @param fd Open file descriptor.
+         * @returns File offset or 0 if it is not available.
+         */
+        inline size_t file_offset(int fd) {
+#ifdef _MSC_VER
+            // https://msdn.microsoft.com/en-us/library/1yee101t.aspx
+            auto offset = _lseeki64(fd, 0, SEEK_CUR);
+#else
+            auto offset = ::lseek(fd, 0, SEEK_CUR);
+#endif
+            if (offset == -1) {
+                return 0;
+            }
+            return size_t(offset);
+        }
+
+        /**
+         * Check whether the file descriptor refers to a TTY.
+         */
+        inline bool isatty(int fd) {
+#ifdef _MSC_VER
+            // https://msdn.microsoft.com/en-us/library/f4s0ddew.aspx
+            return _isatty(fd) != 0;
+#else
+            return ::isatty(fd) != 0;
 #endif
         }
 

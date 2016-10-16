@@ -567,6 +567,20 @@ TEST_CASE("Parse OPL: members") {
         REQUIRE(it == rml.end());
     }
 
+    SECTION("Valid format: one member without role") {
+        const char* const s = "n123@";
+        oid::opl_parse_relation_members(s, s + std::strlen(s), buffer);
+        REQUIRE(buffer.written() > 0);
+        const auto& rml = buffer.get<osmium::RelationMemberList>(0);
+        REQUIRE(rml.size() == 1);
+        auto it = rml.begin();
+        REQUIRE(it->type() == osmium::item_type::node);
+        REQUIRE(it->ref() == 123);
+        REQUIRE(std::string{it->role()} == "");
+        ++it;
+        REQUIRE(it == rml.end());
+    }
+
     SECTION("Valid format: three members") {
         const char* const s = "n123@,w456@abc,r78@type";
         oid::opl_parse_relation_members(s, s + std::strlen(s), buffer);
@@ -967,7 +981,7 @@ TEST_CASE("Get context for errors") {
         bool error = false;
         try {
             oid::opl_parse_line(0, "~~~", buffer);
-        } catch (osmium::opl_error& e) {
+        } catch (const osmium::opl_error& e) {
             error = true;
             REQUIRE(e.line == 0);
             REQUIRE(e.column == 0);
@@ -980,7 +994,7 @@ TEST_CASE("Get context for errors") {
         bool error = false;
         try {
             oid::opl_parse_line(0, "n~~~", buffer);
-        } catch (osmium::opl_error& e) {
+        } catch (const osmium::opl_error& e) {
             error = true;
             REQUIRE(e.line == 0);
             REQUIRE(e.column == 1);
@@ -993,7 +1007,7 @@ TEST_CASE("Get context for errors") {
         bool error = false;
         try {
             oid::opl_parse_line(1, "n123~~~", buffer);
-        } catch (osmium::opl_error& e) {
+        } catch (const osmium::opl_error& e) {
             error = true;
             REQUIRE(e.line == 1);
             REQUIRE(e.column == 4);
@@ -1006,7 +1020,7 @@ TEST_CASE("Get context for errors") {
         bool error = false;
         try {
             oid::opl_parse_line(2, "n123 ~~~", buffer);
-        } catch (osmium::opl_error& e) {
+        } catch (const osmium::opl_error& e) {
             error = true;
             REQUIRE(e.line == 2);
             REQUIRE(e.column == 5);
@@ -1019,7 +1033,7 @@ TEST_CASE("Get context for errors") {
         bool error = false;
         try {
             oid::opl_parse_line(3, "n123 v~~~", buffer);
-        } catch (osmium::opl_error& e) {
+        } catch (const osmium::opl_error& e) {
             error = true;
             REQUIRE(e.line == 3);
             REQUIRE(e.column == 6);

@@ -266,6 +266,9 @@ namespace osmium {
             // Statistics
             area_stats m_stats;
 
+            // The number of members the multipolygon relation has
+            size_t m_num_members = 0;
+
             bool debug() const noexcept {
                 return m_config.debug_level > 1;
             }
@@ -589,7 +592,7 @@ namespace osmium {
                                 if (debug()) {
                                     std::cerr << "        Segment belongs to outer ring\n";
                                 }
-                                int32_t y = int32_t(ay + (by - ay) * (lx - ax) / (bx - ax));
+                                const int32_t y = int32_t(ay + (by - ay) * (lx - ax) / (bx - ax));
                                 outer_rings.emplace_back(y, segment->ring());
                             }
                         }
@@ -1012,7 +1015,7 @@ namespace osmium {
 
                 std::vector<location_to_ring_map> xrings = create_location_to_ring_map(open_ring_its);
 
-                auto ring_min = std::min_element(xrings.begin(), xrings.end(), [](const location_to_ring_map& a, const location_to_ring_map& b) {
+                const auto ring_min = std::min_element(xrings.begin(), xrings.end(), [](const location_to_ring_map& a, const location_to_ring_map& b) {
                     return a.ring().min_segment() < b.ring().min_segment();
                 });
 
@@ -1064,7 +1067,7 @@ namespace osmium {
                 }
 
                 // Find the candidate with the smallest/largest area
-                auto chosen_cand = ring_min_is_outer ?
+                const auto chosen_cand = ring_min_is_outer ?
                      std::min_element(candidates.cbegin(), candidates.cend(), [](const candidate& a, const candidate& b) {
                         return std::abs(a.sum) < std::abs(b.sum);
                      }) :
@@ -1169,6 +1172,20 @@ namespace osmium {
             }
 
             /**
+             * Checks if any ways were completely removed in the
+             * erase_duplicate_segments step.
+             */
+            bool ways_were_lost() {
+                std::unordered_set<const osmium::Way*> ways_in_segments;
+
+                for (const auto& segment : m_segment_list) {
+                    ways_in_segments.insert(segment.way());
+                }
+
+                return ways_in_segments.size() < m_num_members;
+            }
+
+            /**
              * Create rings from segments.
              */
             bool create_rings() {
@@ -1192,6 +1209,15 @@ namespace osmium {
                 if (m_segment_list.empty()) {
                     if (debug()) {
                         std::cerr << "  No segments left\n";
+                    }
+                    return false;
+                }
+
+                // If one or more complete ways was removed because of
+                // duplicate segments, this isn't a valid area.
+                if (ways_were_lost()) {
+                    if (debug()) {
+                        std::cerr << "  Complete ways removed because of duplicate segments\n";
                     }
                     return false;
                 }
@@ -1355,6 +1381,7 @@ namespace osmium {
             }
 
             bool create_area(osmium::memory::Buffer& out_buffer, const osmium::Relation& relation, const std::vector<const osmium::Way*>& members) {
+                m_num_members = members.size();
                 osmium::builder::AreaBuilder builder(out_buffer);
                 builder.initialize_from_object(relation);
 

@@ -108,7 +108,7 @@ namespace osmium {
 
             public:
 
-                HandlerPass1(TCollector& collector) noexcept :
+                explicit HandlerPass1(TCollector& collector) noexcept :
                     m_collector(collector) {
                 }
 
@@ -131,7 +131,7 @@ namespace osmium {
 
             public:
 
-                HandlerPass2(TCollector& collector) noexcept :
+                explicit HandlerPass2(TCollector& collector) noexcept :
                     m_collector(collector) {
                 }
 
@@ -432,7 +432,7 @@ namespace osmium {
                 const osmium::Relation& relation = get_relation(relation_meta);
                 for (const auto& member : relation.members()) {
                     if (member.ref() != 0) {
-                        auto range = find_member_meta(member.type(), member.ref());
+                        const auto range = find_member_meta(member.type(), member.ref());
                         assert(!range.empty());
 
                         // if this is the last time this object was needed

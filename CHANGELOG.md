@@ -8,22 +8,48 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 
+### Changed
+
+- Updated embedded Catch unit test header to version 1.5.7.
+- More speedups for reading and writing OSM files.
+
+### Fixed
+
+- Parsing of coordinates starting with decimal dot.
+- `~` operator for `entity_bits` doesn't set unused bits any more.
+
+
+## [2.9.0] - 2016-09-15
+
+### Added
+
 - Support for reading OPL files.
 - For diff output OSM objects in buffers can be marked as only in one or the
   other file. The OPL and debug output formats support diff output based on
   this.
-- Add documentation and range checks to Tile struct.
+- Add documentation and range checks to `Tile` struct.
 - More documentation.
+- More examples and more extensive comments on examples.
+- Support for a progress report in `osmium::io::Reader()` and a `ProgressBar`
+  utility class to use it.
+- New `OSMObject::set_timestamp(const char*)` function.
 
 ### Changed
 
 - Parse coordinates in scientific notations ourselves.
 - Updated included protozero version to 1.4.2.
+- Lots of one-argument constructors are now explicit.
+- Timestamp parser now uses our own implementation instead of strptime.
+  This is faster and independant of locale settings.
+- More cases of invalid areas with duplicate segments are reported as
+  errors.
 
 ### Fixed
 
 - Fixed a problem limiting cache file sizes on Windows to 32 bit.
 - Fixed includes.
+- Exception messages for invalid areas do not report "area contains no rings"
+  any more, but "invalid area".
 
 
 ## [2.8.0] - 2016-08-04
@@ -90,7 +116,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - New functions for iterating over specific item types in buffers
   (`osmium::memory::Buffer::select()`), over specific subitems
   (`osmium::OSMObject::subitems()`), and for iterating over all rings of
-  an area (`osmium::Areas::outer_rings(`), `inner_rings()`).
+  an area (`osmium::Areas::outer_rings()`, `inner_rings()`).
 - Debug output optionally prints CRC32 when `add_crc32` file option is set.
 
 ### Changed
@@ -247,9 +273,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   one in Writer. Calling flush() on the OutputIterator isn't needed any
   more.
 - Reader now throws when trying to read after eof or an error.
-- I/O functions that used to throw std::runtime_error now throw
-  osmium::io_error or derived.
-- Optional parameters on osmium::io::Writer now work in any order.
+- I/O functions that used to throw `std::runtime_error` now throw
+  `osmium::io_error` or derived.
+- Optional parameters on `osmium::io::Writer` now work in any order.
 
 ### Fixed
 
@@ -390,7 +416,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   Doxygen (up to version 1.8.8). This version contains a workaround to fix
   this.
 
-[unreleased]: https://github.com/osmcode/libosmium/compare/v2.8.0...HEAD
+[unreleased]: https://github.com/osmcode/libosmium/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/osmcode/libosmium/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/osmcode/libosmium/compare/v2.7.2...v2.8.0
 [2.7.2]: https://github.com/osmcode/libosmium/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/osmcode/libosmium/compare/v2.7.0...v2.7.1
