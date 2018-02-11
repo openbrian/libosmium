@@ -5,7 +5,7 @@
 
 This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013-2017 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013-2018 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -120,7 +120,7 @@ namespace osmium {
 
             osmium::thread::thread_handler m_thread{};
 
-            std::size_t m_file_size;
+            std::size_t m_file_size = 0;
 
             osmium::osm_entity_bits::type m_read_which_entities = osmium::osm_entity_bits::all;
             osmium::io::read_meta m_read_metadata = osmium::io::read_meta::yes;

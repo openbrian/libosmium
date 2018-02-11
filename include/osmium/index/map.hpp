@@ -5,7 +5,7 @@
 
 This file is part of Osmium (http://osmcode.org/libosmium).
 
-Copyright 2013-2017 Jochen Topf <jochen@topf.org> and others (see README).
+Copyright 2013-2018 Jochen Topf <jochen@topf.org> and others (see README).
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -285,10 +285,11 @@ namespace osmium {
 
 #define REGISTER_MAP(id, value, klass, name) \
 namespace osmium { namespace index { namespace detail { \
-    const bool OSMIUM_CONCATENATE_(registered_, name) = osmium::index::register_map<id, value, klass>(#name); \
-    inline bool OSMIUM_CONCATENATE_(get_registered_, name)() noexcept { \
-        return OSMIUM_CONCATENATE_(registered_, name); \
-    } \
+    namespace OSMIUM_CONCATENATE_(register_map_, __COUNTER__) { \
+    const bool registered = osmium::index::register_map<id, value, klass>(#name); \
+    inline bool get_registered() noexcept { \
+        return registered; \
+    } } \
 } } }
 
     } // namespace index
